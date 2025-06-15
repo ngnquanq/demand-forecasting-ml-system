@@ -1,0 +1,35 @@
+resources:
+  requests:
+    cpu: "200m"
+    memory: "200Mi"
+  limits:
+    cpu: "1000m"
+    memory: "2Gi"
+
+antiAffinity: "soft"
+
+elasticsearchRef:
+  # This tells Kibana which Elasticsearch cluster to connect to.
+  # Assuming your Elasticsearch Helm release name is 'elasticsearch' (which it is, from your Jenkinsfile env)
+  # The default service name created by the Elastic Elasticsearch chart is usually '<release-name>-master'
+  # So, if your release name is 'elasticsearch', the service name will be 'elasticsearch-master'.
+  name: "elasticsearch-master" 
+  # This usually defaults to 9200, but explicit is good:
+  # port: 9200 
+
+# Or, if you prefer specifying hosts directly (less dynamic for service discovery):
+# elasticsearchHosts: ["http://elasticsearch-master:9200"] 
+
+# Authentication details for Kibana to connect to Elasticsearch
+# This is the CRUCIAL part for resolving the 401 error.
+# The Elasticsearch chart automatically generates a secret containing 'elastic' username and password.
+# Kibana should be configured to read from this secret.
+elasticsearchSecret:
+  secretName: "elasticsearch-master-credentials" 
+  usernameKey: "username" 
+  passwordKey: "password" 
+  
+
+# Enable readiness probe for better health checks
+readinessProbe:
+  enabled: true

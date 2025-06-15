@@ -1,0 +1,11 @@
+*/__pycache__
+.env
+*.pkl
+.pyc
+.qodo/
+mlartifacts/
+mlruns/
+.pytest_cache/
+.coverage
+.sourcery.yaml
+*.mp4

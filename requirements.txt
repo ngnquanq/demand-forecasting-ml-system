@@ -1,0 +1,16 @@
+fastapi[standard]>=0.112.0,<0.113.0
+pandas==2.2.3
+numpy==1.24.3
+pydantic
+typing-extensions
+statsmodels
+kaggle
+skforecast==0.15
+pytest==8.3.5
+lightgbm==4.6.0
+plotly==6.1.0
+shap==0.47.2 #
+flash==1.0.3 #
+astral==3.2 #
+nbformat>=4.2.0
+pytest-cov

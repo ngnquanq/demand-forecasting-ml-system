@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Simple Demand Forecasting</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="section">
+<div class="container">
+    <h1 class="title">Demand Forecasting</h1>
+    <form id="predictForm">
+        <div class="field">
+            <label class="label">CSV File</label>
+            <div class="control">
+                <input id="file" class="input" type="file" required>
+            </div>
+        </div>
+        <div class="field is-grouped">
+            <div class="control">
+                <label class="label">Forecast Hours</label>
+                <input id="forecast_hours" class="input" type="number" value="36">
+            </div>
+            <div class="control">
+                <label class="label">Window Sizes</label>
+                <input id="window_sizes" class="input" type="number" value="72">
+            </div>
+        </div>
+        <div class="field">
+            <div class="control">
+                <button class="button is-primary" type="submit">Predict</button>
+                <button id="downloadBtn" class="button is-link" type="button">Download CSV</button>
+            </div>
+        </div>
+    </form>
+
+    <div class="box">
+        <canvas id="forecastChart"></canvas>
+    </div>
+
+    <table id="resultsTable" class="table is-striped is-fullwidth">
+        <thead></thead>
+        <tbody></tbody>
+    </table>
+</div>
+<script src="/static/script.js"></script>
+</body>
+</html>
