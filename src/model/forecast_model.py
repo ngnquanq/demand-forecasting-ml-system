@@ -1,5 +1,6 @@
 from lightgbm import LGBMRegressor
-from skforecast.recursive import ForecasterEquivalentDate, ForecasterRecursive
+from skforecast.recursive import ForecasterRecursive
+from fastapi import FastAPI, File, UploadFile, HTTPException, Request
 from skforecast.model_selection import (
     TimeSeriesFold,
     bayesian_search_forecaster,
@@ -20,7 +21,12 @@ from skforecast.recursive import ForecasterRecursive
 from skforecast.model_selection import bayesian_search_forecaster, TimeSeriesFold
 from optuna.trial import Trial
 
+import os
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from src.model.forecast_model import *
+from src.data.data_loader import * 
 def run_bayesian_hyperparameter_search_and_fit(
     data: pd.DataFrame,
     end_validation: Union[str, pd.Timestamp],
@@ -190,3 +196,52 @@ def train_forecaster_with_best_params(
 
     return final_forecaster
 
+def forecast_with_tuning(file: UploadFile, forecast_hours: int, window_sizes: int):
+    data = load_data_from_csv(file)
+    y = data["users"].copy()
+    exog = data.drop(columns=["users"]).copy()
+    exog_features = exog.columns.to_list()
+
+    end_validation = data.index[-forecast_hours - 1].strftime('%Y-%m-%d %H:%M:%S')
+    end_validation_dt = pd.to_datetime(end_validation) + pd.Timedelta(hours=1)
+
+    window_features = RollingFeatures(stats=['mean'], window_sizes=window_sizes)
+    encoder = create_encoder()
+
+    result = run_bayesian_hyperparameter_search_and_fit(
+        data=data,
+        end_validation=end_validation,
+        exog_features=exog_features,
+        window_features=window_features,
+        transformer_exog=encoder,
+        n_trials=10,
+        steps=forecast_hours,
+        initial_train_size=round(len(y) * 0.9),
+        random_state=2025
+    )
+
+    model = train_forecaster_with_best_params(
+        data=data,
+        end_validation=end_validation,
+        exog_features=exog_features,
+        window_features=window_features,
+        transformer_exog=encoder,
+        best_params=result["best_params"],
+        best_lags=result["best_lags"]
+    )
+
+    exog_pred = data.loc[end_validation_dt:, exog_features].head(forecast_hours)
+    predictions = model.predict(steps=forecast_hours, exog=exog_pred)
+
+    future_index = exog_pred.index
+    forecast_df = pd.DataFrame({
+        "date_time": future_index,
+        "predicted_users": np.ceil(predictions).astype(int),
+        "real_users": data.loc[future_index, "users"].values
+    })
+    forecast_df.set_index("date_time", inplace=True)
+    forecast_df = pd.concat([forecast_df, exog_pred], axis=1)
+    mae = mean_absolute_error(forecast_df["real_users"], forecast_df["predicted_users"])
+    forecast_df.index = forecast_df.index.strftime("%Y-%m-%d %H:%M:%S")
+
+    return forecast_df, mae
