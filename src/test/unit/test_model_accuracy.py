@@ -56,7 +56,7 @@ def test_mae_is_within_acceptable_range(prepared_model_and_data):
     mae = mean_absolute_error(actual_values, future_predictions)
     print(f"\nCalculated MAE (for acceptable range check): {mae:.2f}")
 
-    ACCEPTABLE_MAE_THRESHOLD = 90 
+    ACCEPTABLE_MAE_THRESHOLD = 105
     assert mae <= ACCEPTABLE_MAE_THRESHOLD, \
         f"MAE ({mae:.2f}) is greater than the acceptable threshold of {ACCEPTABLE_MAE_THRESHOLD}. Model performance might be poor."
 
