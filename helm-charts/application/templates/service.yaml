@@ -10,7 +10,7 @@ spec:
     app: {{ .Release.Name }}
   ports:
     - name: http
-      port: 8000
-      targetPort: 8000
+      port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.targetPort }}
       protocol: TCP
-  type: LoadBalancer
+  type: {{ .Values.service.type }}

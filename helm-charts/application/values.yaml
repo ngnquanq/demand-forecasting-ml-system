@@ -3,13 +3,10 @@ image:
   tag: latest
   pullPolicy: Always
 
-persistence:
-  logs:
-    enabled: true
-    storageClass: "standard" 
-    size: 2Gi
-
 service:
   type: LoadBalancer
   port: 8000
   targetPort: 8000
+
+spec:
+  replicas: 3

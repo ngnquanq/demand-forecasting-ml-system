@@ -1,5 +1,5 @@
 apiVersion: v2
-name: hpp
+name: demandforecasting
 description: My Helm Chart for my bike rental demand forecasting application
 
 # A chart can be `application` or `library`,
