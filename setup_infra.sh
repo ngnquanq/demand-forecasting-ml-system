@@ -20,6 +20,7 @@ INVENTORY_DIR="./inventory"
 SSH_PRIVATE_KEY_FILE="~/.ssh/google_compute_engine"
 VM_NAME="demandforecasting-vm" 
 TERRAFORM_CONFIG_DIR="./provision"
+
 # login and choose the project
 gcloud auth login --no-launch-browser
 echo "Setting project to: $GCLOUD_PROJECT_ID"
