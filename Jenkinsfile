@@ -21,7 +21,8 @@ pipeline {
                 script {
                     echo 'Setup scripts for pipeline...'
                     // Load the application deployment  script
-                    def setupEnv = load 'jenkins/scripts/deployApp.groovy'
+                    def deployApp = load 'jenkins/scripts/deployApp.groovy'
+                    echo "DEBUG: deployApp = ${deployApp}, type = ${deployApp.getClass().getName()}"
                 }
             }
         }
