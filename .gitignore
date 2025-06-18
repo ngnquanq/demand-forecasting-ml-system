@@ -206,3 +206,6 @@ __marimo__/
 .terraform.lock.hcl
 *.tfstate
 *.tfstate.backup
+
+# playground folder
+playground/
