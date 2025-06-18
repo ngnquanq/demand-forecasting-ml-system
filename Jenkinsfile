@@ -16,7 +16,15 @@ pipeline {
 
     stages {
         //1. Testing
-
+        stage('setup') {
+            steps {
+                script {
+                    echo 'Setup scripts for pipeline...'
+                    // Load the application deployment  script
+                    def setupEnv = load 'jenkins/scripts/deployApp.groovy'
+                }
+            }
+        }
         stage('Test') {
             steps {
             script {
@@ -85,7 +93,7 @@ pipeline {
             steps {
                 script {
                     container('helm') {
-                        def deployApp = load 'jenkins/scripts/deployApp.groovy'
+                        //def deployApp = load 'jenkins/scripts/deployApp.groovy'
                         deployApp(env)
                     }
                 }
