@@ -85,13 +85,12 @@ pipeline {
             steps {
                 script {
                     container('helm') {
-                        def deployApp = load 'vars/deployApp.groovy'
+                        def deployApp = load 'jenkins/scripts/deployApp.groovy'
                         deployApp(env)
                     }
                 }
             }
         }
-
 
     }
     post {
