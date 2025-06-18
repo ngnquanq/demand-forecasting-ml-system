@@ -85,7 +85,7 @@ pipeline {
             steps {
                 script {
                     container('helm') {
-                        def deployApp = load 'scripts/deployApp.groovy'
+                        def deployApp = load 'vars/deployApp.groovy'
                         deployApp(env)
                     }
                 }
