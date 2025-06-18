@@ -1,14 +1,14 @@
+import io
 import os
 import sys
+
+import numpy as np
 import pandas as pd
-from fastapi import HTTPException, UploadFile
 import pytest
-import io
+from fastapi import HTTPException, UploadFile
+from sklearn.compose import make_column_selector, make_column_transformer
 from sklearn.metrics import mean_absolute_error
 from sklearn.preprocessing import OrdinalEncoder
-from sklearn.compose import make_column_transformer, make_column_selector
-import numpy as np 
-
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -23,12 +23,12 @@ def test_mae_is_larger_than_100(prepared_model_and_data):
     model, exog_for_prediction, actual_values = prepared_model_and_data
 
     future_predictions = model.predict(
-        steps=len(actual_values),
-        exog=exog_for_prediction
+        steps=len(actual_values), exog=exog_for_prediction
     )
 
-    assert len(future_predictions) == len(actual_values), \
-        "Prediction length does not match actuals length for MAE calculation."
+    assert len(future_predictions) == len(
+        actual_values
+    ), "Prediction length does not match actuals length for MAE calculation."
 
     mae = mean_absolute_error(actual_values, future_predictions)
     print(f"\nCalculated MAE (for >100 check): {mae:.2f}")
@@ -46,17 +46,17 @@ def test_mae_is_within_acceptable_range(prepared_model_and_data):
     model, exog_for_prediction, actual_values = prepared_model_and_data
 
     future_predictions = model.predict(
-        steps=len(actual_values),
-        exog=exog_for_prediction
+        steps=len(actual_values), exog=exog_for_prediction
     )
 
-    assert len(future_predictions) == len(actual_values), \
-        "Prediction length does not match actuals length for MAE calculation."
+    assert len(future_predictions) == len(
+        actual_values
+    ), "Prediction length does not match actuals length for MAE calculation."
 
     mae = mean_absolute_error(actual_values, future_predictions)
     print(f"\nCalculated MAE (for acceptable range check): {mae:.2f}")
 
     ACCEPTABLE_MAE_THRESHOLD = 105
-    assert mae <= ACCEPTABLE_MAE_THRESHOLD, \
-        f"MAE ({mae:.2f}) is greater than the acceptable threshold of {ACCEPTABLE_MAE_THRESHOLD}. Model performance might be poor."
-
+    assert (
+        mae <= ACCEPTABLE_MAE_THRESHOLD
+    ), f"MAE ({mae:.2f}) is greater than the acceptable threshold of {ACCEPTABLE_MAE_THRESHOLD}. Model performance might be poor."

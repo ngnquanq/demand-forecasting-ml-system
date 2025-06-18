@@ -1,49 +1,41 @@
+import os
+import sys
+from typing import Any, Dict, List, Optional, Union
+
+import pandas as pd
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from lightgbm import LGBMRegressor
-from skforecast.recursive import ForecasterRecursive
-from fastapi import FastAPI, File, UploadFile, HTTPException, Request
+from optuna.trial import Trial
 from skforecast.model_selection import (
     TimeSeriesFold,
     bayesian_search_forecaster,
 )
 from skforecast.preprocessing import RollingFeatures
-
-
-import pandas as pd
-from typing import Union, List
 from skforecast.recursive import ForecasterRecursive
-from skforecast.model_selection import bayesian_search_forecaster, TimeSeriesFold
-from optuna.trial import Trial
-import pandas as pd
-from typing import Any, Dict, List, Optional, Union
-import pandas as pd
-from lightgbm import LGBMRegressor
-from skforecast.recursive import ForecasterRecursive
-from skforecast.model_selection import bayesian_search_forecaster, TimeSeriesFold
-from optuna.trial import Trial
 
-import os
-import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from src.data.data_loader import *
 from src.model.forecast_model import *
-from src.data.data_loader import * 
+
+
 def run_bayesian_hyperparameter_search_and_fit(
     data: pd.DataFrame,
     end_validation: Union[str, pd.Timestamp],
     exog_features: List[str],
-    window_features: RollingFeatures=None,
+    window_features: RollingFeatures = None,
     transformer_exog: Optional[Any] = None,
     n_trials: int = 20,
     random_state: int = 15926,
     steps: Optional[int] = None,
-    initial_train_size: Optional[int] = None
+    initial_train_size: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
     Perform a Bayesian hyperparameter (including lag) search and return:
       - best_params: dictionary of optimal LightGBM hyperparameters + random_state & verbose flags
       - best_lags: integer or list of integers indicating the chosen lag configuration
       - model: a ForecasterRecursive instance fitted on all data up to end_validation
-    
+
     Parameters
     ----------
     data : pd.DataFrame
@@ -96,6 +88,7 @@ def run_bayesian_hyperparameter_search_and_fit(
 
     # 2. Define the Optuna search space, including lags as a categorical parameter :contentReference[oaicite:13]{index=13}
     lags_grid = [48, 72, [1, 2, 3, 23, 24, 25, 167, 168, 169]]
+
     def search_space(trial: Trial) -> Dict[str, Any]:
         return {
             "n_estimators": trial.suggest_int("n_estimators", 300, 1000, step=100),
@@ -107,7 +100,7 @@ def run_bayesian_hyperparameter_search_and_fit(
             "reg_alpha": trial.suggest_float("reg_alpha", 0.0, 1.0),
             "reg_lambda": trial.suggest_float("reg_lambda", 0.0, 1.0),
             "max_bin": trial.suggest_int("max_bin", 50, 250),
-            "lags": trial.suggest_categorical("lags", lags_grid)
+            "lags": trial.suggest_categorical("lags", lags_grid),
         }
 
     # 3. Instantiate a placeholder ForecasterRecursive (lags will be overridden by search) :contentReference[oaicite:14]{index=14}
@@ -116,13 +109,13 @@ def run_bayesian_hyperparameter_search_and_fit(
         lags=72,
         window_features=window_features,
         transformer_exog=transformer_exog,
-        fit_kwargs={"categorical_feature": "auto"}
+        fit_kwargs={"categorical_feature": "auto"},
     )
 
     # 4. Configure TimeSeriesFold for backtesting :contentReference[oaicite:15]{index=15}
     if steps is None and initial_train_size is None:
         cv_search = TimeSeriesFold(steps=None, initial_train_size=None)
-    else: 
+    else:
         cv_search = TimeSeriesFold(steps=steps, initial_train_size=initial_train_size)
 
     # 5. Run the Bayesian search over the training+validation period :contentReference[oaicite:16]{index=16}
@@ -137,7 +130,7 @@ def run_bayesian_hyperparameter_search_and_fit(
         random_state=random_state,
         return_best=True,
         verbose=False,
-        show_progress=True
+        show_progress=True,
     )
     print(type(results_search))
     print(results_search)
@@ -148,11 +141,11 @@ def run_bayesian_hyperparameter_search_and_fit(
     best_params["verbose"] = -1
     best_lags = results_search["lags"].iloc[0]
 
-
     return {
         "best_params": best_params,
         "best_lags": best_lags,
     }
+
 
 def train_forecaster_with_best_params(
     data: pd.DataFrame,
@@ -161,22 +154,24 @@ def train_forecaster_with_best_params(
     window_features: Optional[List[Any]] = None,
     transformer_exog: Optional[Any] = None,
     best_params: Dict[str, Any] = None,
-    best_lags: Union[int, List[int]] = None
+    best_lags: Union[int, List[int]] = None,
 ) -> ForecasterRecursive:
     """
-    1. Given best_params and best_lags (from hyperparameter search), 
+    1. Given best_params and best_lags (from hyperparameter search),
        create a new ForecasterRecursive with those settings.
     2. Fit it on the combined data up through end_validation.
-    
+
     Returns
     -------
     ForecasterRecursive: Fitted model ready for prediction.
     """
     if best_params is None or best_lags is None:
         raise ValueError("`best_params` and `best_lags` must be provided.")
-    
+
     # 1. Create a fresh LightGBM regressor with best_params (except 'lags')
-    lgbm_kwargs = {k: v for k, v in best_params.items() if k not in ["random_state", "verbose"]}
+    lgbm_kwargs = {
+        k: v for k, v in best_params.items() if k not in ["random_state", "verbose"]
+    }
     regressor = LGBMRegressor(**lgbm_kwargs)  # :contentReference[oaicite:38]{index=38}
 
     # 2. Instantiate ForecasterRecursive with best_lags
@@ -185,16 +180,17 @@ def train_forecaster_with_best_params(
         lags=best_lags,
         window_features=window_features,
         transformer_exog=transformer_exog,
-        fit_kwargs={"categorical_feature": "auto"}
+        fit_kwargs={"categorical_feature": "auto"},
     )
 
     # 3. Fit on all data ≤ end_validation
     final_forecaster.fit(
         y=data.loc[:end_validation, "users"],
-        exog=data.loc[:end_validation, exog_features]
+        exog=data.loc[:end_validation, exog_features],
     )
 
     return final_forecaster
+
 
 def forecast_with_tuning(file: UploadFile, forecast_hours: int, window_sizes: int):
     data = load_data_from_csv(file)
@@ -202,10 +198,10 @@ def forecast_with_tuning(file: UploadFile, forecast_hours: int, window_sizes: in
     exog = data.drop(columns=["users"]).copy()
     exog_features = exog.columns.to_list()
 
-    end_validation = data.index[-forecast_hours - 1].strftime('%Y-%m-%d %H:%M:%S')
+    end_validation = data.index[-forecast_hours - 1].strftime("%Y-%m-%d %H:%M:%S")
     end_validation_dt = pd.to_datetime(end_validation) + pd.Timedelta(hours=1)
 
-    window_features = RollingFeatures(stats=['mean'], window_sizes=window_sizes)
+    window_features = RollingFeatures(stats=["mean"], window_sizes=window_sizes)
     encoder = create_encoder()
 
     result = run_bayesian_hyperparameter_search_and_fit(
@@ -217,7 +213,7 @@ def forecast_with_tuning(file: UploadFile, forecast_hours: int, window_sizes: in
         n_trials=10,
         steps=forecast_hours,
         initial_train_size=round(len(y) * 0.9),
-        random_state=2025
+        random_state=2025,
     )
 
     model = train_forecaster_with_best_params(
@@ -227,18 +223,20 @@ def forecast_with_tuning(file: UploadFile, forecast_hours: int, window_sizes: in
         window_features=window_features,
         transformer_exog=encoder,
         best_params=result["best_params"],
-        best_lags=result["best_lags"]
+        best_lags=result["best_lags"],
     )
 
     exog_pred = data.loc[end_validation_dt:, exog_features].head(forecast_hours)
     predictions = model.predict(steps=forecast_hours, exog=exog_pred)
 
     future_index = exog_pred.index
-    forecast_df = pd.DataFrame({
-        "date_time": future_index,
-        "predicted_users": np.ceil(predictions).astype(int),
-        "real_users": data.loc[future_index, "users"].values
-    })
+    forecast_df = pd.DataFrame(
+        {
+            "date_time": future_index,
+            "predicted_users": np.ceil(predictions).astype(int),
+            "real_users": data.loc[future_index, "users"].values,
+        }
+    )
     forecast_df.set_index("date_time", inplace=True)
     forecast_df = pd.concat([forecast_df, exog_pred], axis=1)
     mae = mean_absolute_error(forecast_df["real_users"], forecast_df["predicted_users"])
