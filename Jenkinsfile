@@ -25,7 +25,7 @@ pipeline {
                 sh 'python -m pip install -r requirements.txt'
                 // Run pytest including coverage threshold; capture exit code
                 def status = sh(
-                    script: 'python -m pytest --cov=src --cov-fail-under=80 src/test',
+                    script: 'python -m pytest --cov=src --cov-fail-under=80 ',
                     returnStatus: true
                 )
                 if (status != 0) {
