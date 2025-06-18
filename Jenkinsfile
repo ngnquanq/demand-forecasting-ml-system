@@ -86,6 +86,8 @@ pipeline {
             }
             steps {
                 script {
+                    def deployApp = load 'jenkins/scripts/deployApp.groovy'
+
                     container('helm') {
                         deployApp(env) 
                     }
