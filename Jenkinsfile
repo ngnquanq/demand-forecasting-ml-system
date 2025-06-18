@@ -1,4 +1,3 @@
-def deployApp // Declare globally so all stages can access it
 
 pipeline {
     agent any
@@ -20,7 +19,7 @@ pipeline {
             steps {
                 script {
                     echo 'Setup scripts for pipeline...'
-                    deployApp = load 'jenkins/scripts/deployApp.groovy'
+                    def deployApp = load 'jenkins/scripts/deployApp.groovy'
                     echo "DEBUG: deployApp = ${deployApp}, type = ${deployApp.getClass().getName()}"
                 }
             }

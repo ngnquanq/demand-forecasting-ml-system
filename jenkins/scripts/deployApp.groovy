@@ -64,3 +64,5 @@ def call(env) {
         error "Swagger never became ready."
     }
 }
+
+return this
