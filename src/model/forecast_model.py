@@ -3,7 +3,7 @@ import sys
 from typing import Any, Dict, List, Optional, Union
 
 import pandas as pd
-from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import UploadFile
 from lightgbm import LGBMRegressor
 from optuna.trial import Trial
 from skforecast.model_selection import (

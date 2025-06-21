@@ -19,4 +19,11 @@ spec:
         - name: {{ .Release.Name }}
           image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
           imagePullPolicy: "{{ .Values.image.pullPolicy }}"
-
+          env:
+            # Each environment variable needs its own hyphenated list item
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ .Values.tracing.environmentVariables.OTEL_EXPORTER_OTLP_ENDPOINT | quote }} # Added | quote for safety
+            - name: OTEL_SERVICE_NAME
+              value: {{ .Values.tracing.environmentVariables.OTEL_SERVICE_NAME | quote }} # Added | quote for safety
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: {{ .Values.tracing.environmentVariables.OTEL_RESOURCE_ATTRIBUTES | quote }} # Added | quote for safety

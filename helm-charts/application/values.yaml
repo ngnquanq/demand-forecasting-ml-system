@@ -1,12 +1,23 @@
 image:
   repository: docker.io/ngnquanq/demand-forecasting
-  tag: latest
+  tag: v3
   pullPolicy: Always
 
 service:
-  type: LoadBalancer
+  type: ClusterIP
   port: 8000
   targetPort: 8000
 
 spec:
   replicas: 3
+
+tracing:
+  enabled: true
+  environmentVariables:
+    OTEL_EXPORTER_OTLP_ENDPOINT: "http://jaeger-collector.tracing.svc.cluster.local:4318/v1/traces" # <-- Add /v1/traces
+    OTEL_SERVICE_NAME: "demand-forecasting-service"
+    OTEL_RESOURCE_ATTRIBUTES: "service.name=demand-forecasting-service"
+
+ingress:
+  enabled: true
+  host: "ngnquanq.34.42.167.0.nip.io"
