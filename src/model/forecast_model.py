@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional, Union
 import pandas as pd
 from fastapi import UploadFile
 from lightgbm import LGBMRegressor
+from opentelemetry import trace
 from optuna.trial import Trial
 from skforecast.model_selection import (
     TimeSeriesFold,
@@ -17,6 +18,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.data.data_loader import *
 from src.model.forecast_model import *
+
+tracer = trace.get_tracer(__name__)
 
 
 def run_bayesian_hyperparameter_search_and_fit(
@@ -193,53 +196,81 @@ def train_forecaster_with_best_params(
 
 
 def forecast_with_tuning(file: UploadFile, forecast_hours: int, window_sizes: int):
-    data = load_data_from_csv(file)
-    y = data["users"].copy()
-    exog = data.drop(columns=["users"]).copy()
-    exog_features = exog.columns.to_list()
+    with tracer.start_as_current_span("forecast_with_tuning") as root_span:
+        # Step 1: Load data
+        with tracer.start_as_current_span("load-data"):
+            data = load_data_from_csv(file)
 
-    end_validation = data.index[-forecast_hours - 1].strftime("%Y-%m-%d %H:%M:%S")
-    end_validation_dt = pd.to_datetime(end_validation) + pd.Timedelta(hours=1)
+        # Step 2: Feature extraction
+        with tracer.start_as_current_span("extract-features") as span:
+            y = data["users"].copy()
+            exog = data.drop(columns=["users"]).copy()
+            exog_features = exog.columns.to_list()
+            span.set_attribute("num_features", len(exog_features))
 
-    window_features = RollingFeatures(stats=["mean"], window_sizes=window_sizes)
-    encoder = create_encoder()
+        # Step 3: Validation slicing
+        with tracer.start_as_current_span("prepare-validation-window"):
+            end_validation = data.index[-forecast_hours - 1].strftime(
+                "%Y-%m-%d %H:%M:%S"
+            )
+            end_validation_dt = pd.to_datetime(end_validation) + pd.Timedelta(hours=1)
 
-    result = run_bayesian_hyperparameter_search_and_fit(
-        data=data,
-        end_validation=end_validation,
-        exog_features=exog_features,
-        window_features=window_features,
-        transformer_exog=encoder,
-        n_trials=10,
-        steps=forecast_hours,
-        initial_train_size=round(len(y) * 0.9),
-        random_state=2025,
-    )
+        # Step 4: Create transformers
+        with tracer.start_as_current_span("init-transformers"):
+            window_features = RollingFeatures(stats=["mean"], window_sizes=window_sizes)
+            encoder = create_encoder()
 
-    model = train_forecaster_with_best_params(
-        data=data,
-        end_validation=end_validation,
-        exog_features=exog_features,
-        window_features=window_features,
-        transformer_exog=encoder,
-        best_params=result["best_params"],
-        best_lags=result["best_lags"],
-    )
+        # Step 5: Hyperparameter tuning
+        with tracer.start_as_current_span("tune-model") as tuning_span:
+            result = run_bayesian_hyperparameter_search_and_fit(
+                data=data,
+                end_validation=end_validation,
+                exog_features=exog_features,
+                window_features=window_features,
+                transformer_exog=encoder,
+                n_trials=10,
+                steps=forecast_hours,
+                initial_train_size=round(len(y) * 0.9),
+                random_state=2025,
+            )
+            tuning_span.set_attribute("best_score", result.get("best_score", "n/a"))
 
-    exog_pred = data.loc[end_validation_dt:, exog_features].head(forecast_hours)
-    predictions = model.predict(steps=forecast_hours, exog=exog_pred)
+        # Step 6: Train final model
+        with tracer.start_as_current_span("train-best-model"):
+            model = train_forecaster_with_best_params(
+                data=data,
+                end_validation=end_validation,
+                exog_features=exog_features,
+                window_features=window_features,
+                transformer_exog=encoder,
+                best_params=result["best_params"],
+                best_lags=result["best_lags"],
+            )
 
-    future_index = exog_pred.index
-    forecast_df = pd.DataFrame(
-        {
-            "date_time": future_index,
-            "predicted_users": np.ceil(predictions).astype(int),
-            "real_users": data.loc[future_index, "users"].values,
-        }
-    )
-    forecast_df.set_index("date_time", inplace=True)
-    forecast_df = pd.concat([forecast_df, exog_pred], axis=1)
-    mae = mean_absolute_error(forecast_df["real_users"], forecast_df["predicted_users"])
-    forecast_df.index = forecast_df.index.strftime("%Y-%m-%d %H:%M:%S")
+        # Step 7: Make prediction
+        with tracer.start_as_current_span("make-predictions"):
+            exog_pred = data.loc[end_validation_dt:, exog_features].head(forecast_hours)
+            predictions = model.predict(steps=forecast_hours, exog=exog_pred)
 
-    return forecast_df, mae
+        # Step 8: Post-process forecast
+        with tracer.start_as_current_span("combine-results") as combine_span:
+            future_index = exog_pred.index
+            forecast_df = pd.DataFrame(
+                {
+                    "date_time": future_index,
+                    "predicted_users": np.ceil(predictions).astype(int),
+                    "real_users": data.loc[future_index, "users"].values,
+                }
+            )
+            forecast_df.set_index("date_time", inplace=True)
+            forecast_df = pd.concat([forecast_df, exog_pred], axis=1)
+
+        # Step 9: Evaluate
+        with tracer.start_as_current_span("evaluate") as eval_span:
+            mae = mean_absolute_error(
+                forecast_df["real_users"], forecast_df["predicted_users"]
+            )
+            forecast_df.index = forecast_df.index.strftime("%Y-%m-%d %H:%M:%S")
+            eval_span.set_attribute("mae", mae)
+
+        return forecast_df, mae

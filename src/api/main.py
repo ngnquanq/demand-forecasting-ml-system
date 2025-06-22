@@ -25,8 +25,10 @@ resource = Resource.create(
     }
 )
 
+# Create a TracerProvider with the defined resource
 provider = TracerProvider(resource=resource)
-otlp_exporter = OTLPSpanExporter()
+otlp_endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318")
+otlp_exporter = OTLPSpanExporter(endpoint=otlp_endpoint)
 span_processor = BatchSpanProcessor(otlp_exporter)
 
 # Add the span processor to the provider
