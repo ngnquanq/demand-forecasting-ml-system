@@ -4,13 +4,13 @@ metadata:
   name: application-ingressroute
   namespace: model-serving
   labels:
-    app.kubernetes.io/name: demand-forecasting 
-    app.kubernetes.io/instance: application    
+    app.kubernetes.io/name: demand-forecasting
+    app.kubernetes.io/instance: application
 spec:
   entryPoints:
     - web
   routes:
-      match: Host(`{{ .Values.ingress.host }}`)
+    - match: Host(`{{ .Values.ingress.host }}`)
       kind: Rule
       services:
         - name: application
