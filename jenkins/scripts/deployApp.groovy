@@ -1,5 +1,5 @@
-def call(env) {
-    def serviceName = "application"
+// jenkins/scripts/deployApp.groovy
+def call(env, applicationImageWithTag) { 
     def namespace = "model-serving"
     def ingressNamespace = "ingress" 
     def ingressServiceName = "traefik"
@@ -7,34 +7,52 @@ def call(env) {
     def releaseName = env.HELM_RELEASE_NAME
     def chartPath = env.HELM_CHART_PATH
 
+    // Parse the full image tag into repository and tag
+    def applicationImageParts = applicationImageWithTag.split(':')
+    def repository = applicationImageParts[0]
+    def tag = applicationImageParts[1]
+
     // 1. Deploy/Upgrade with Helm
-    echo "Deploying/upgrading Helm release '${releaseName}' in namespace '${namespace}'..."
-    sh "helm upgrade --install ${releaseName} ${chartPath} --namespace ${namespace}"
+    echo "Deploying/upgrading Helm release '${releaseName}' in namespace '${namespace}' with image: ${repository}:${tag}..."
+    // Crucial Change: Add --set flags to override image.repository and image.tag in values.yaml
+    sh """
+        helm upgrade --install ${releaseName} ${chartPath} \\
+            --namespace ${namespace} \\
+            --set image.repository=${repository} \\
+            --set image.tag=${tag} \\
+            --wait # It's good practice to wait for the deployment to stabilize
+    """
     echo "Helm deployment/upgrade complete."
 
     // 2. Rollout restart
+    // You might not need a separate rollout restart if --wait is used with helm upgrade
+    // Helm typically handles the rollout correctly when it updates the deployment.
+    // However, if you want to ensure a fresh restart for any reason, keep it.
+    echo "Initiating rollout restart for deployment/${deploymentName}..."
     sh "kubectl rollout restart deployment/${deploymentName} -n ${namespace}"
     sh "kubectl rollout status deployment/${deploymentName} -n ${namespace} --timeout=5m"
     echo "Rollout completed."
 
-    // 3. Wait for external IP
+    // 3. Wait for external IP (assuming this is the Traefik LoadBalancer IP)
     def externalIp = ""
     def maxAttempts = 20
     def attempt = 0
+    echo "Waiting for external IP of ${ingressServiceName} in ${ingressNamespace} namespace..."
     while (externalIp == "" && attempt < maxAttempts) {
         attempt++
         try {
+            // Using a more robust jsonpath for safety
             externalIp = sh(script: "kubectl get svc ${ingressServiceName} -n ${ingressNamespace} -o jsonpath='{.status.loadBalancer.ingress[0].ip}'", returnStdout: true).trim()
         } catch (e) {
-            echo "Attempt ${attempt}: Waiting for external IP..."
+            echo "Attempt ${attempt}: Still waiting for external IP (error: ${e.getMessage()})"
         }
         if (externalIp == "") {
-            sleep 15
+            sleep 15 // Wait 15 seconds
         }
     }
 
     if (externalIp == "") {
-        error "Failed to get external IP for ${serviceName} after ${maxAttempts} attempts."
+        error "Failed to get external IP for ${ingressServiceName} after ${maxAttempts} attempts."
     }
 
     echo "External IP: ${externalIp}"
@@ -43,14 +61,16 @@ def call(env) {
     def swaggerUp = false
     def swaggerAttempts = 10
     def swaggerAttempt = 0
+    echo "Checking Swagger UI at http://${externalIp}/docs..."
 
     while (!swaggerUp && swaggerAttempt < swaggerAttempts) {
         swaggerAttempt++
         try {
+            // Ensure curl exists in the 'helm' container. If not, add it to jenkins_registry image.
             def httpCode = sh(script: "curl -s -o /dev/null -w \"%{http_code}\" http://${externalIp}/docs", returnStdout: true).trim()
             if (httpCode == "200") {
                 swaggerUp = true
-                echo "Swagger is UP!"
+                echo "Swagger is UP! (HTTP ${httpCode})"
             } else {
                 echo "Attempt ${swaggerAttempt}: Swagger not ready (HTTP ${httpCode})"
             }
@@ -58,12 +78,12 @@ def call(env) {
             echo "Attempt ${swaggerAttempt}: Error checking Swagger: ${e.getMessage()}"
         }
         if (!swaggerUp) {
-            sleep 10
+            sleep 10 // Wait 10 seconds
         }
     }
 
     if (!swaggerUp) {
-        error "Swagger never became ready."
+        error "Swagger never became ready after ${swaggerAttempts} attempts."
     }
 }
 

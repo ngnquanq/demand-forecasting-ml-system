@@ -29,6 +29,7 @@ pipeline {
                     steps {
                         script {
                             echo '🔍 Running tests with coverage guard…'
+                            sh 'apt-get update && apt-get install -y libgomp1'
                             sh 'python --version'
                             sh 'python -m pip install -r requirements.txt'
                             def status = sh(
@@ -71,26 +72,27 @@ pipeline {
         }
 
         stage('Deploy the main application') {
-            agent {
-                kubernetes {
-                    containerTemplate {
-                        name 'helm'
-                        image "${jenkins_registry}:${jenkins_tag}"
-                        alwaysPullImage true
+                    agent {
+                        kubernetes {
+                            containerTemplate {
+                                name 'helm'
+                                image "${jenkins_registry}:${jenkins_tag}" // Your Jenkins/Helm tools image
+                                alwaysPullImage true
+                            }
+                        }
                     }
-                }
-            }
-            steps {
-                script {
-                    // Make sure 'jenkins/scripts/deployApp.groovy' exists and is accessible from the workspace.
-                    def deployApp = load 'jenkins/scripts/deployApp.groovy'
+                    steps {
+                        script {
+                            def deployApp = load 'jenkins/scripts/deployApp.groovy'
 
-                    container('helm') {
-                        deployApp(env, "${application_registry}:${application_tag}")
+                            container('helm') {
+                                // Pass the 'env' map and the full application image tag
+                                // ${application_registry}:${application_tag} should be the image you just built
+                                deployApp(env, "${application_registry}:${application_tag}")
+                            }
+                        }
                     }
                 }
-            }
-        }
     }
 
     post {
