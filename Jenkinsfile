@@ -4,7 +4,7 @@ pipeline {
     environment {
         // Dynamic app tag based on build number
         application_registry            = 'ngnquanq/demand-forecasting'
-        application_tag                  = "${env.BUILD_NUMBER}"
+        application_tag                  = "v${env.BUILD_NUMBER}"
 
         jenkins_registry                = 'ngnquanq/custom-jenkins'
         jenkins_tag                     = "1.0.0"
@@ -88,7 +88,7 @@ pipeline {
                             container('helm') {
                                 // Pass the 'env' map and the full application image tag
                                 // ${application_registry}:${application_tag} should be the image you just built
-                                deployApp(env, "${application_registry}:${application_tag}")
+                                deployApp(env, "v${application_registry}:${application_tag}")
                             }
                         }
                     }
