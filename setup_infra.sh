@@ -19,7 +19,8 @@ GCP_ANSIBLE_USER="nhatquang"
 INVENTORY_DIR="./inventory"
 SSH_PRIVATE_KEY_FILE="~/.ssh/google_compute_engine"
 VM_NAME="demandforecasting-vm" 
-TERRAFORM_CONFIG_DIR="./provision"
+TERRAFORM_CONFIG_DIR="./terraform/"
+REPO_DIR=$(pwd)
 
 # login and choose the project
 gcloud auth login --no-launch-browser
@@ -31,13 +32,13 @@ echo "Project set to: $GCLOUD_PROJECT_ID"
 gcloud services enable compute.googleapis.com container.googleapis.com 
 
 # spin up vm and k8s
-cd ./infrastructure/provision
+cd ./infrastructure/terraform
 terraform init
 terraform apply -auto-approve
 echo "Infrastructure provisioned successfully."
 
 # prepare ansible w docker
-cd ../config
+cd ../jenkins
 echo "Installing Docker dependencies..."
 ansible-galaxy collection install community.docker
 echo "Ensuring SSH key is registered with OS Login..."
@@ -128,7 +129,7 @@ REMOTE_COMMAND="
 "
 
 echo "Waiting for Jenkins to fully initialize (approx. 60-120 seconds)..."
-sleep 120 
+#sleep 120 
 
 #execute the remote command using gcloud compute ssh
 echo "Attempting to retrieve password from VM..."
@@ -181,10 +182,13 @@ echo "Kubernetes cluster connected successfully."
 echo "--------------------------------------------------------"
 # Create binding for the Jenkins service
 echo "Creating Kubernetes service account and binding for Jenkins..."
-cd ~/demandForecasting
+cd $REPO_DIR
 kubectl create ns model-serving
+kubectl create ns ingress
 kubectl create ns logging
 kubectl create ns monitoring
+kubectl create ns tracing
+
 # kubectl apply -f ./helm-charts/jenkins-namespace-creator-rbac.yaml
 kubectl create clusterrolebinding model-serving-admin-binding \
   --clusterrole=admin \
@@ -200,4 +204,104 @@ kubectl create clusterrolebinding jenkins-elk-deployer-cluster-admin \
   --clusterrole=cluster-admin \
   --serviceaccount=model-serving:default
 echo "Kubernetes service account and binding created successfully."
+echo "--------------------------------------------------------"
+echo "Setup load balancer for application..."
+# Create a load balancer for the application
+helm upgrade --install traefik ./helm-charts/traefik \
+  --namespace ingress \
+  -f ./helm-charts/traefik/values.yaml 
+
+echo "Waiting for Traefik deployment to be ready (up to 5 minutes)..."
+kubectl rollout status deployment/traefik -n ingress --timeout=5m
+if [ $? -ne 0 ]; then
+    echo "Error: Traefik deployment didn't become ready in time. Exiting."
+    exit 1
+fi
+
+echo "Load balancer for application created successfully."
+echo "Promote external IP to static..."
+EXTERNAL_IP=$(kubectl get svc -n ingress traefik -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+gcloud compute addresses create traefik-static-ip \
+  --addresses "$EXTERNAL_IP" \
+  --region "$GCP_REGION"
+
+echo "Attempted to promote IP '$EXTERNAL_IP' to static IP 'traefik-static-ip'."
+yq e ".ingress.host = \"$EXTERNAL_IP\"" -i ./helm-charts/application/values.yaml
+yq e ".service.spec.loadBalancerIP = \"$EXTERNAL_IP\"" -i ./helm-charts/traefik/values.yaml
+echo "Updated application values.yaml with static IP: $EXTERNAL_IP"
+echo "Setup completed successfully. You can now access your application at http://$EXTERNAL_IP"
+echo "--------------------------------------------------------"
+echo "Setup tracing for the application..."
+# Setup tracing for the application
+helm upgrade --install jaeger ./helm-charts/jaeger \
+  --namespace tracing \
+  -f ./helm-charts/jaeger/values.yaml
+if [ $? -ne 0 ]; then
+    echo "Error: Jaeger Helm installation/upgrade failed. Exiting."
+    exit 1
+fi
+echo "Jaeger Helm chart command finished."
+
+# Wait for Jaeger's deployment to be fully ready. Stop if it takes too long.
+echo "Waiting for Jaeger deployment to be ready (up to 5-10 minutes)..."
+kubectl rollout status deployment/jaeger-query -n tracing --timeout=10m
+
+# Check if Jaeger pods are ready. If not, stop.
+if [ $? -ne 0 ]; then
+    echo "Error: Jaeger deployment didn't become ready in time. Exiting."
+    exit 1
+fi
+echo "Tracing setup completed successfully."
+echo "--------------------------------------------------------"
+echo "Setup logging for the application..."
+# Setup logging for the application
+helm upgrade --install elasticsearch ./helm-charts/elk/elasticsearch \
+  --namespace logging \
+  -f ./helm-charts/elk/elasticsearch/values.yaml
+kubectl rollout status statefulset/elasticsearch-master -n logging --timeout=10m
+if [ $? -ne 0 ]; then echo "Error: Elasticsearch didn't become ready. Exiting."; exit 1; fi
+echo "Elasticsearch is ready."
+
+
+helm upgrade --install logstash ./helm-charts/elk/logstash \
+  --namespace logging \
+  -f ./helm-charts/elk/logstash/logstash-values.yaml
+kubectl rollout status statefulset/logstash-logstash -n logging --timeout=5m
+if [ $? -ne 0 ]; then echo "Error: Logstash didn't become ready. Exiting."; exit 1; fi
+echo "Logstash is ready."
+
+helm upgrade --install filebeat ./helm-charts/elk/filebeat \
+  --namespace logging \
+  -f ./helm-charts/elk/filebeat/filebeat-values.yaml
+kubectl rollout status daemonset/filebeat-filebeat -n logging --timeout=5m
+if [ $? -ne 0 ]; then echo "Error: Filebeat didn't become ready. Exiting."; exit 1; fi
+echo "Filebeat is ready."
+
+helm upgrade --install kibana ./helm-charts/elk/kibana \
+  --namespace logging \
+  -f ./helm-charts/elk/kibana/kibana-values.yaml
+kubectl rollout status deployment/kibana-kibana -n logging --timeout=5m
+if [ $? -ne 0 ]; then echo "Error: Kibana didn't become ready. Exiting."; exit 1; fi
+echo "Kibana is ready."
+
+
+echo "Logging setup approximately 2 minutes..."
+sleep 120
+echo "Logging setup completed successfully."
+echo "To get Kibana username and password, run the following command:"
+echo "kubectl get secret elasticsearch-master-credentials -n logging -o jsonpath='{.data.username}' | base64 --decode"
+echo "kubectl get secret elasticsearch-master-credentials -n logging -o jsonpath='{.data.password}' | base64 --decode"
+echo "--------------------------------------------------------"
+echo "Setup monitoring for the application..."
+# Setup monitoring for the application
+helm upgrade --install monitoring ./helm-charts/kube-prometheus-stack \
+  --namespace monitoring \
+  -f ./helm-charts/kube-prometheus-stack/values.yaml
+echo "Monitoring setup approximately 2 minutes..."
+sleep 120
+echo "Monitoring setup completed successfully."
+echo "You can access the Prometheus dashboard using port fowarding"
+echo "Username: admin"
+echo "Password: prom-operator"
+echo "Monitoring setup completed successfully."
 echo "--------------------------------------------------------"
