@@ -1,6 +1,8 @@
 def call(env) {
     def serviceName = "application"
     def namespace = "model-serving"
+    def ingressNamespace = "ingress" 
+    def ingressServiceName = "traefik"
     def deploymentName = env.KUBE_DEPLOYMENT_NAME
     def releaseName = env.HELM_RELEASE_NAME
     def chartPath = env.HELM_CHART_PATH
@@ -22,7 +24,7 @@ def call(env) {
     while (externalIp == "" && attempt < maxAttempts) {
         attempt++
         try {
-            externalIp = sh(script: "kubectl get svc ${serviceName} -n ${namespace} -o jsonpath='{.status.loadBalancer.ingress[0].ip}'", returnStdout: true).trim()
+            externalIp = sh(script: "kubectl get svc ${ingressServiceName} -n ${ingressNamespace} -o jsonpath='{.status.loadBalancer.ingress[0].ip}'", returnStdout: true).trim()
         } catch (e) {
             echo "Attempt ${attempt}: Waiting for external IP..."
         }
@@ -45,7 +47,7 @@ def call(env) {
     while (!swaggerUp && swaggerAttempt < swaggerAttempts) {
         swaggerAttempt++
         try {
-            def httpCode = sh(script: "curl -s -o /dev/null -w \"%{http_code}\" http://${externalIp}:8000/docs", returnStdout: true).trim()
+            def httpCode = sh(script: "curl -s -o /dev/null -w \"%{http_code}\" http://${externalIp}/docs", returnStdout: true).trim()
             if (httpCode == "200") {
                 swaggerUp = true
                 echo "Swagger is UP!"

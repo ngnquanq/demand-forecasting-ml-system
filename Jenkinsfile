@@ -3,9 +3,14 @@ pipeline {
     agent any
     
     environment {
+        // Dynamic app tag based on build number
         application_registry            = 'ngnquanq/demand-forecasting'
-        application_tag                  = 'latest'
+        application_tag                  = "${env.BUILD_NUMBER}"
+
         jenkins_registry                = 'ngnquanq/custom-jenkins'
+        jenkins_tag                     = "1.0.0"
+
+        // Other environment variables
         dockerhub_registryCredentialID  = 'dockerhub'
         HELM_RELEASE_NAME                = 'application'
         HELM_CHART_PATH                  = './helm-charts/application'
@@ -15,16 +20,6 @@ pipeline {
     }
 
     stages {
-        stage('Setup') {
-            steps {
-                script {
-                    echo 'Setup scripts for pipeline...'
-                    def deployApp = load 'jenkins/scripts/deployApp.groovy'
-                    echo "DEBUG: deployApp = ${deployApp}, type = ${deployApp.getClass().getName()}"
-                }
-            }
-        }
-
         stage('Test') {
             steps {
                 script {
@@ -48,9 +43,9 @@ pipeline {
             steps {
                 script {
                     echo 'Building Docker image model image...'
-                    sh 'docker build -t $application_registry .'
+                    sh 'docker build -t ${application_registry}:${application_tag} .'
                     echo 'Building Docker image jenkins image...'
-                    sh 'docker build -t $jenkins_registry ./infrastructure/jenkins/'
+                    sh 'docker build -t ${jenkins_registry}:${jenkins_tag} ./infrastructure/jenkins/'
                 }
             }
         }
@@ -63,11 +58,8 @@ pipeline {
                         usernameVariable: 'DOCKER_USER',
                         passwordVariable: 'DOCKER_PASS'
                     )]) {
-                        sh 'docker login -u $DOCKER_USER -p $DOCKER_PASS'
-                        sh 'docker tag $application_registry $application_registry:$application_tag'
-                        sh 'docker tag $jenkins_registry $jenkins_registry:$application_tag'
-                        sh 'docker push $application_registry:$application_tag'
-                        sh 'docker push $jenkins_registry:$application_tag'
+                        sh 'docker push ${application_registry}:${application_tag}'
+                        sh 'docker push ${jenkins_registry}:${jenkins_tag}'
                         echo 'Docker images pushed successfully!'
                     }
                 }
@@ -79,7 +71,7 @@ pipeline {
                 kubernetes {
                     containerTemplate {
                         name 'helm'
-                        image 'ngnquanq/custom-jenkins:latest'
+                        image "${jenkins_registry}:${jenkins_tag}"
                         alwaysPullImage true
                     }
                 }
@@ -89,7 +81,7 @@ pipeline {
                     def deployApp = load 'jenkins/scripts/deployApp.groovy'
 
                     container('helm') {
-                        deployApp(env) 
+                        deployApp(env, "{application_registry}:${application_tag}")
                     }
                 }
             }
@@ -111,7 +103,7 @@ pipeline {
                 withCredentials([string(credentialsId: 'discord', variable: 'DISCORD_WEBHOOK_URL')]) {
                     discordSend description: 'Build failed! Check Jenkins for details.',
                                  webhookURL: "${DISCORD_WEBHOOK_URL}",
-                                 title: "Deployment Failed"
+                                 title: 'Deployment Failed'
                 }
             }
         }
