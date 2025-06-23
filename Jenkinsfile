@@ -63,6 +63,7 @@ pipeline {
                         usernameVariable: 'DOCKER_USER',
                         passwordVariable: 'DOCKER_PASS'
                     )]) {
+                        sh "echo ${DOCKER_PASS} | docker login -u ${DOCKER_USER} --password-stdin"
                         sh "docker push ${application_registry}:${application_tag}"
                         sh "docker push ${jenkins_registry}:${jenkins_tag}" 
                         echo 'Docker images pushed successfully!'
@@ -86,9 +87,7 @@ pipeline {
                             def deployApp = load 'jenkins/scripts/deployApp.groovy'
 
                             container('helm') {
-                                // Pass the 'env' map and the full application image tag
-                                // ${application_registry}:${application_tag} should be the image you just built
-                                deployApp(env, "v${application_registry}:${application_tag}")
+                                deployApp(env, "${application_registry}:${application_tag}")
                             }
                         }
                     }
