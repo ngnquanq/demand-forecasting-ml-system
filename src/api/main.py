@@ -3,7 +3,7 @@ import sys
 import time
 from functools import wraps
 
-from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile
 from fastapi.staticfiles import StaticFiles
 from loguru import logger
 from opentelemetry import trace
@@ -115,7 +115,11 @@ async def root():
 @app.post("/predict-tuning")
 @logger.catch
 async def predict_tuning(
-    file: UploadFile = File(...), forecast_hours: int = 36, window_sizes: int = 72
+    file: UploadFile = File(...),
+    forecast_hours: int = Query(..., gt=0, description="Number of hours to forecast"),
+    window_sizes: int = Query(
+        ..., gt=0, description="Window sizes for rolling features"
+    ),
 ):
     # Start a new span for the entire prediction request
     with tracer.start_as_current_span("predict-tuning-request") as span:
