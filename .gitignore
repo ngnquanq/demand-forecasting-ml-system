@@ -209,3 +209,9 @@ __marimo__/
 
 # playground folder
 playground/
+
+# pre commit 
+.pre-commit-config.yaml
+.isort.cfg
+.flake8
+pyproject.toml

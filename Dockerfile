@@ -3,6 +3,7 @@ FROM python:3.10-slim AS runtime
 # 1. Prevent python from writing .pyc files & set workdir
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
+ENV PORT=8000
 WORKDIR /app
 
 # Add libgomp1 for lightbm to avoid error when run on Jenkins 
@@ -26,4 +27,4 @@ RUN mkdir -p /var/log/container && \
 EXPOSE 8000
 
 # 6. Setup entrypoint and use the logging config
-CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--log-config", "src/logging.conf"]
+CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
