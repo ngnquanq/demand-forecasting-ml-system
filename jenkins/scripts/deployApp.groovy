@@ -20,14 +20,11 @@ def call(env, applicationImageWithTag) {
             --namespace ${namespace} \\
             --set image.repository=${repository} \\
             --set image.tag=${tag} \\
-            --wait # It's good practice to wait for the deployment to stabilize
+            --wait 
     """
     echo "Helm deployment/upgrade complete."
 
     // 2. Rollout restart
-    // You might not need a separate rollout restart if --wait is used with helm upgrade
-    // Helm typically handles the rollout correctly when it updates the deployment.
-    // However, if you want to ensure a fresh restart for any reason, keep it.
     echo "Initiating rollout restart for deployment/${deploymentName}..."
     sh "kubectl rollout restart deployment/${deploymentName} -n ${namespace}"
     sh "kubectl rollout status deployment/${deploymentName} -n ${namespace} --timeout=5m"
@@ -41,13 +38,12 @@ def call(env, applicationImageWithTag) {
     while (externalIp == "" && attempt < maxAttempts) {
         attempt++
         try {
-            // Using a more robust jsonpath for safety
             externalIp = sh(script: "kubectl get svc ${ingressServiceName} -n ${ingressNamespace} -o jsonpath='{.status.loadBalancer.ingress[0].ip}'", returnStdout: true).trim()
         } catch (e) {
             echo "Attempt ${attempt}: Still waiting for external IP (error: ${e.getMessage()})"
         }
         if (externalIp == "") {
-            sleep 15 // Wait 15 seconds
+            sleep 15 
         }
     }
 
@@ -66,7 +62,6 @@ def call(env, applicationImageWithTag) {
     while (!swaggerUp && swaggerAttempt < swaggerAttempts) {
         swaggerAttempt++
         try {
-            // Ensure curl exists in the 'helm' container. If not, add it to jenkins_registry image.
             def httpCode = sh(script: "curl -s -o /dev/null -w \"%{http_code}\" http://${externalIp}/docs", returnStdout: true).trim()
             if (httpCode == "200") {
                 swaggerUp = true
@@ -78,7 +73,7 @@ def call(env, applicationImageWithTag) {
             echo "Attempt ${swaggerAttempt}: Error checking Swagger: ${e.getMessage()}"
         }
         if (!swaggerUp) {
-            sleep 10 // Wait 10 seconds
+            sleep 10
         }
     }
 

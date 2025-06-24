@@ -17,7 +17,3 @@ maintainers:
   - email: nhatquangdata2011@gmail.com
     name: Nhat Quang
 
-# dependencies:
-#   - name: kube-prometheus-stack
-#     version: "71.1.0"
-#     repository: "https://prometheus-community.github.io/helm-charts"

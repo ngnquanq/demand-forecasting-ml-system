@@ -129,7 +129,7 @@ REMOTE_COMMAND="
 "
 
 echo "Waiting for Jenkins to fully initialize (approx. 60-120 seconds)..."
-#sleep 120 
+sleep 120 
 
 #execute the remote command using gcloud compute ssh
 echo "Attempting to retrieve password from VM..."
@@ -285,8 +285,7 @@ if [ $? -ne 0 ]; then echo "Error: Kibana didn't become ready. Exiting."; exit 1
 echo "Kibana is ready."
 
 
-echo "Logging setup approximately 2 minutes..."
-sleep 120
+#echo "Logging setup approximately 2 minutes..."
 echo "Logging setup completed successfully."
 echo "To get Kibana username and password, run the following command:"
 echo "kubectl get secret elasticsearch-master-credentials -n logging -o jsonpath='{.data.username}' | base64 --decode"

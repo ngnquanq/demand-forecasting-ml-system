@@ -29,7 +29,11 @@ def test_static_index(client):
     assert response.status_code == 200
 
 
-def _convert_to_csv(prediction: dict) -> str:
+def test_csv_download_includes_all_columns(client, csv_file):
+    params = {"forecast_hours": 36, "window_sizes": 72}
+    response = client.post("/predict-tuning", files=csv_file, params=params)
+    assert response.status_code == 200
+    prediction = response.json()["prediction"]
     first_key = next(iter(prediction))
     cols = list(prediction[first_key].keys())
     lines = [",".join(["date_time"] + cols)]
@@ -37,15 +41,7 @@ def _convert_to_csv(prediction: dict) -> str:
         ",".join([dt] + [str(values[c]) for c in cols])
         for dt, values in prediction.items()
     )
-    return "\n".join(lines)
-
-
-def test_csv_download_includes_all_columns(client, csv_file):
-    params = {"forecast_hours": 36, "window_sizes": 72}
-    response = client.post("/predict-tuning", files=csv_file, params=params)
-    assert response.status_code == 200
-    prediction = response.json()["prediction"]
-    csv_content = _convert_to_csv(prediction)
+    csv_content = "\n".join(lines)
     header = csv_content.splitlines()[0].split(",")
     first_key = next(iter(prediction))
     expected = ["date_time"] + list(prediction[first_key].keys())
