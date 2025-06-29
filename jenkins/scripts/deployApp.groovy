@@ -81,6 +81,6 @@ def call(env, applicationImageWithTag) {
         error "Swagger never became ready after ${swaggerAttempts} attempts."
     }
 
-    return externalIp
 }
 
+return this

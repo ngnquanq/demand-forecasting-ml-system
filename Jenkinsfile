@@ -89,8 +89,8 @@ pipeline {
                     def deployApp = load 'jenkins/scripts/deployApp.groovy'
 
                     container('helm') {
-                        env.EXTERNAL_APP_URL = deployApp(env, "${application_registry}:${application_tag}")
-                        echo "Deployment complete. External Application URL: ${env.EXTERNAL_APP_URL}"                    }
+                        deployApp(env, "${application_registry}:${application_tag}")
+                    }
                 }
             }
         }
@@ -100,10 +100,10 @@ pipeline {
         success {
             script {
                 withCredentials([string(credentialsId: 'discord', variable: 'DISCORD_WEBHOOK_URL')]) {
-                    def appAccessUrl = env.EXTERNAL_APP_URL ? "http://${env.EXTERNAL_APP_URL}/docs" : "the application URL (check Kubernetes services)"
-                    discordSend description: "Build succeeded! Access the application via ${appAccessUrl}",
+                    discordSend description: "Build succeeded!",
                                  webhookURL: "${DISCORD_WEBHOOK_URL}",
                                  title: "Deployment Successful & Observability Details"
+
                 }
             }
         }
