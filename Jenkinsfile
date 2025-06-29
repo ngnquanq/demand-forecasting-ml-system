@@ -4,7 +4,7 @@ pipeline {
     environment {
         // Dynamic app tag based on build number
         application_registry            = 'ngnquanq/demand-forecasting'
-        application_tag                  = "v${env.BUILD_NUMBER} - ${new Date().format('yyyyMMdd')}"
+        application_tag                  = "v${env.BUILD_NUMBER}-${new Date().format('yyyyMMdd')}"
 
         jenkins_registry                = 'ngnquanq/custom-jenkins'
         jenkins_tag                     = "1.0.0"
@@ -48,7 +48,7 @@ pipeline {
             steps {
                 script {
                     echo 'Building Docker image model image...'
-                    sh "docker build -t ${application_registry}:${application_tag} ." 
+                    sh "docker build -t ${application_registry}:${application_tag} ."
                     echo 'Building Docker image jenkins image...'
                     sh "docker build -t ${jenkins_registry}:${jenkins_tag} ./infrastructure/jenkins/" 
                 }
@@ -67,7 +67,6 @@ pipeline {
                     ]) {
                         sh "echo ${DOCKER_PASS} | docker login -u ${DOCKER_USER} --password-stdin"
                         sh "docker push ${application_registry}:${application_tag}"
-                        sh "docker push ${jenkins_registry}:${jenkins_tag}" 
                         echo '✅ Docker images pushed successfully!'
                     }
                 }
@@ -90,8 +89,8 @@ pipeline {
                     def deployApp = load 'jenkins/scripts/deployApp.groovy'
 
                     container('helm') {
-                        deployApp(env, "${application_registry}:${application_tag}")
-                    }
+                        env.EXTERNAL_APP_URL = deployApp(env, "${application_registry}:${application_tag}")
+                        echo "Deployment complete. External Application URL: ${env.EXTERNAL_APP_URL}"                    }
                 }
             }
         }
@@ -101,10 +100,10 @@ pipeline {
         success {
             script {
                 withCredentials([string(credentialsId: 'discord', variable: 'DISCORD_WEBHOOK_URL')]) {
-                    discordSend description: "Build succeeded! Access the applition via http://${externalIp}/docs",
+                    def appAccessUrl = env.EXTERNAL_APP_URL ? "http://${env.EXTERNAL_APP_URL}/docs" : "the application URL (check Kubernetes services)"
+                    discordSend description: "Build succeeded! Access the application via ${appAccessUrl}",
                                  webhookURL: "${DISCORD_WEBHOOK_URL}",
                                  title: "Deployment Successful & Observability Details"
-
                 }
             }
         }
