@@ -25,6 +25,12 @@ resource = Resource.create(
     }
 )
 
+# For the testing purpose
+env_value = os.environ.get("ENV")
+IS_TESTING = (env_value is None) or (
+    env_value.lower() == "test" if env_value else False
+)
+
 # Create a TracerProvider with the defined resource
 provider = TracerProvider(resource=resource)
 otlp_endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318")
@@ -73,6 +79,12 @@ tracer = trace.get_tracer(
 )  # This tracer will now use the configured provider
 
 
+def apply_logger_catch(func):
+    if not IS_TESTING:
+        return logger.catch(func)
+    return func
+
+
 def log_request_middleware(func):
     @wraps(func)
     async def wrapper(request: Request, call_next):
@@ -110,6 +122,36 @@ async def dispatch_middleware(request: Request, call_next):
 async def root():
     logger.info("Root endpoint called")
     return {"message": "Hello World"}
+
+
+@app.get("/data-range")
+@logger.catch
+async def get_data_range():
+    """
+    Returns the minimum and maximum timestamps available in the database.
+    """
+    with tracer.start_as_current_span("get-data-range-request") as span:
+        logger.info("Request received for data range.")
+        try:
+            min_time, max_time = get_min_max_time_from_db()
+            logger.info(
+                "Successfully retrieved data range.",
+                min_time=min_time,
+                max_time=max_time,
+            )
+
+            # Convert datetime objects to ISO format string for JSON serialization
+            return {
+                "min_time": min_time.isoformat() if min_time else None,
+                "max_time": max_time.isoformat() if max_time else None,
+            }
+        except Exception as e:
+            logger.error(f"Failed to retrieve data range: {e}")
+            span.set_attribute("error", True)
+            span.set_attribute("error.message", str(e))
+            raise HTTPException(
+                status_code=500, detail=f"Failed to retrieve data range: {str(e)}"
+            )
 
 
 @app.post("/predict-tuning")
@@ -171,6 +213,87 @@ async def predict_tuning(
             span.set_attribute("error", True)
             span.set_attribute("error.message", str(e))
             raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/predict-tuning-db")
+@apply_logger_catch
+async def predict_tuning_db(
+    forecast_hours: int = Query(..., gt=0, description="Number of hours to forecast"),
+    window_sizes: int = Query(
+        ..., gt=0, description="Window sizes for rolling features"
+    ),
+    start_time: str = Query(
+        ..., description="Start timestamp for data (e.g., '2012-08-31 17:00:00+00')"
+    ),
+    stop_time: str = Query(
+        ..., description="Stop timestamp for data (e.g., '2012-09-01 00:00:00+00')"
+    ),
+):
+    with tracer.start_as_current_span("predict-tuning-db-request") as span:
+        span.set_attribute("forecast_hours", forecast_hours)
+        span.set_attribute("window_sizes", window_sizes)
+        span.set_attribute("data_start_time", start_time)
+        span.set_attribute("data_stop_time", stop_time)
+
+    logger.info(
+        "Prediction request received (DB-based).",
+        forecast_hours=forecast_hours,
+        window_sizes=window_sizes,
+        start_time=start_time,
+        stop_time=stop_time,
+    )
+
+    if int(forecast_hours) <= 0 or int(window_sizes) <= 0:
+        logger.warning(
+            "Invalid input for forecast_hours or window_sizes.",
+            forecast_hours=forecast_hours,
+            window_sizes=window_sizes,
+        )
+        span.set_attribute("error", True)
+        span.set_attribute(
+            "error.message", "forecast_hours and window_sizes must be > 0"
+        )
+        raise HTTPException(
+            status_code=400, detail="forecast_hours and window_sizes must be > 0"
+        )
+
+    try:
+        pd.to_datetime(start_time)
+        pd.to_datetime(stop_time)
+    except ValueError:
+        logger.warning("Invalid start_time or stop_time format.")
+        span.set_attribute("error", True)
+        span.set_attribute("error.message", "Invalid start_time or stop_time format.")
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid start_time or stop_time format. UseYYYY-MM-DD HH:MM:SS[+HH] format.",
+        )
+
+    try:
+        with logger.contextualize(model_operation="forecast_tuning_db"):
+            with tracer.start_as_current_span("forecast-with-tuning-db") as tuning_span:
+                forecast_df, mae = forecast_with_tuning_db(
+                    forecast_hours=forecast_hours,
+                    window_sizes=window_sizes,
+                    start_time=start_time,
+                    stop_time=stop_time,
+                )
+                tuning_span.set_attribute("mae", mae)
+
+            logger.info("Forecast tuning (DB-based) completed successfully.", mae=mae)
+            return {
+                "message": "Prediction endpoint success (DB-based)",
+                "prediction": forecast_df.to_dict(orient="index"),
+                "mae": mae,
+            }
+    except Exception as e:
+        logger.error(f"Prediction (DB-based) failed due to an unhandled error: {e}")
+        span.set_attribute("error", True)
+        span.set_attribute("error.message", str(e))
+        # Explicitly return JSONResponse here to ensure content consistency
+        return JSONResponse(
+            status_code=500, content={"detail": str(e)}
+        )  # <--- Crucial change here
 
 
 if __name__ == "__main__":
