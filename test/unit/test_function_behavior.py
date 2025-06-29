@@ -1,5 +1,6 @@
 import os
 import sys
+from unittest.mock import patch
 
 import pandas as pd
 import pytest
@@ -9,7 +10,8 @@ from fastapi.testclient import TestClient
 # Add the root directory to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.data.data_loader import load_data_from_csv
+from src.data.data_loader import *
+from src.model.forecast_model import *
 
 
 def test_load_data_from_csv_success(
@@ -78,6 +80,52 @@ def test_load_data_from_csv_empty_strings(
     assert isinstance(df, pd.DataFrame)
     assert pd.isna(df["weather"][0])
     assert df["weather"][1] == "clear"
+
+
+def test_default_values():
+    """
+    Test that the function returns default values when no environment variables
+    are set. The clean_env fixture (from conftest.py) ensures this state.
+    """
+    host, database, user, password, schema_name, table_name, time_column = (
+        get_db_connection_params()
+    )
+
+    assert host == DEFAULT_DB_HOST
+    assert database == DEFAULT_DB_NAME
+    assert user == DEFAULT_DB_USER
+    assert password == DEFAULT_DB_PASSWORD
+    assert schema_name == DEFAULT_SCHEMA_NAME
+    assert table_name == DEFAULT_TABLE_NAME
+    assert time_column == DEFAULT_TIME_COLUMN
+
+
+def test_all_env_variables_set():
+    """
+    Test that the function correctly retrieves values from environment
+    variables when all are set.
+    """
+    mock_env = {
+        "DB_HOST": "my_host",
+        "DB_NAME": "my_database",
+        "DB_USER": "my_user",
+        "DB_PASSWORD": "my_password",
+        "DB_SCHEMA": "my_schema",
+        "DB_TABLE": "my_table",
+        "TIME_COLUMN": "updated_at",
+    }
+    with patch.dict(os.environ, mock_env):
+        host, database, user, password, schema_name, table_name, time_column = (
+            get_db_connection_params()
+        )
+
+        assert host == "my_host"
+        assert database == "my_database"
+        assert user == "my_user"
+        assert password == "my_password"
+        assert schema_name == "my_schema"
+        assert table_name == "my_table"
+        assert time_column == "updated_at"
 
 
 if __name__ == "__main__":

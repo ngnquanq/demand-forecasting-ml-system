@@ -1,23 +1,29 @@
 image:
   repository: docker.io/ngnquanq/demand-forecasting
-  tag: v5.1
+  tag: v6
   pullPolicy: Always
-
 service:
   type: ClusterIP
   port: 8000
   targetPort: 8000
-
 spec:
   replicas: 3
-
 tracing:
   enabled: true
   environmentVariables:
-    OTEL_EXPORTER_OTLP_ENDPOINT: "http://jaeger-collector.tracing.svc.cluster.local:4318/v1/traces" 
+    OTEL_EXPORTER_OTLP_ENDPOINT: "http://jaeger-collector.tracing.svc.cluster.local:4318/v1/traces"
     OTEL_SERVICE_NAME: "demand-forecasting-service"
     OTEL_RESOURCE_ATTRIBUTES: "service.name=demand-forecasting-service"
-
+database:
+  enabled: true
+  environmentVariables:
+    DB_HOST: "timescaledb-cluster.database.svc.cluster.local"
+    DB_NAME: "postgres"
+    DB_USER: "postgres"
+    DB_PASSWORD: "timescaledb" # for demonstration purpose (not rec for prod)
+    SCHEMA_NAME: "application"
+    TABLE_NAME: "feature"
+    TIME_COLUMN: "date_time"
 ingress:
   enabled: true
-  host: "34.58.254.112"
+  host: "35.193.75.222"

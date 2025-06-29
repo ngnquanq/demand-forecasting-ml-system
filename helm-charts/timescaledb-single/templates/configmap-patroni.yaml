@@ -1,0 +1,19 @@
+# This file and its contents are licensed under the Apache License 2.0.
+# Please see the included NOTICE for copyright information and LICENSE for a copy of the license.
+
+{{- /*
+This ConfigMap contains the full Patroni configuration - excluding the credentials for users.
+*/ -}}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "timescaledb.fullname" . }}-patroni
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{ include "timescaledb-helm.labels" . | nindent 4 }}
+    app.kubernetes.io/component: patroni
+data:
+  patroni.yaml: |
+{{ .Values.patroni | toYaml | indent 4 }}
+...

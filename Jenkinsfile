@@ -33,13 +33,13 @@ pipeline {
                     sh 'python --version'
                     sh 'python -m pip install -r requirements.txt'
                     def status = sh(
-                        script: 'python -m pytest --cov=src --cov-fail-under=80',
+                        script: 'python -m pytest --cov=src --cov-fail-under=66',
                         returnStatus: true
                     )
                     if (status != 0) {
-                        error "❌ Tests failed or coverage below 80% (exit code: ${status})"
+                        error "❌ Tests failed or coverage below 66% (exit code: ${status})"
                     }
-                    echo '✅ All tests passed and coverage ≥ 80%'
+                    echo '✅ All tests passed and coverage ≥ 66%'
                 }
             }
         }

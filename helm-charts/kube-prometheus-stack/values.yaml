@@ -138,41 +138,17 @@ global:
 ## ref: https://prometheus.io/docs/alerting/alertmanager/
 ##
 alertmanager:
-
-  ## Deploy alertmanager
-  ##
   enabled: true
-
-  ## Annotations for Alertmanager
-  ##
   annotations: {}
-
-  ## Api that prometheus will use to communicate with alertmanager. Possible values are v1, v2
-  ##
   apiVersion: v2
-
-  ## Service account for Alertmanager to use.
-  ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/
-  ##
   serviceAccount:
     create: true
     name: ""
     annotations: {}
-
-  ## Configure pod disruption budgets for Alertmanager
-  ## ref: https://kubernetes.io/docs/tasks/run-application/configure-pdb/#specifying-a-poddisruptionbudget
-  ## This configuration is immutable once created and will require the PDB to be deleted to be changed
-  ## https://github.com/kubernetes/kubernetes/issues/45398
-  ##
   podDisruptionBudget:
     enabled: false
     minAvailable: 1
     maxUnavailable: ""
-
-  ## Alertmanager configuration directives
-  ## ref: https://prometheus.io/docs/alerting/configuration/#configuration-file
-  ##      https://prometheus.io/webtools/alerting/routing-tree-editor/
-  ##
   config:
     global:
       resolve_timeout: 5m
@@ -207,26 +183,17 @@ alertmanager:
       - receiver: 'null'
         matchers:
           - alertname =~ "InfoInhibitor|Watchdog"
+      - receiver: 'discord-alerts' 
+      matchers:
+        - severity =~ "critical|warning"
     receivers:
     - name: 'null'
+    - name: 'discord-alerts' 
+      webhook_configs:
+      - url: 'YOUR_DISCORD_WEBHOOK_URL_HERE' #Be careful, some dude may use this and bombing your discord lol =))))
     templates:
     - '/etc/alertmanager/config/*.tmpl'
-
-  ## Alertmanager configuration directives (as string type, preferred over the config hash map)
-  ## stringConfig will be used only, if tplConfig is true
-  ## ref: https://prometheus.io/docs/alerting/configuration/#configuration-file
-  ##      https://prometheus.io/webtools/alerting/routing-tree-editor/
-  ##
   stringConfig: ""
-
-  ## Pass the Alertmanager configuration directives through Helm's templating
-  ## engine. If the Alertmanager configuration contains Alertmanager templates,
-  ## they'll need to be properly escaped so that they are not interpreted by
-  ## Helm
-  ## ref: https://helm.sh/docs/developing_charts/#using-the-tpl-function
-  ##      https://prometheus.io/docs/alerting/configuration/#tmpl_string
-  ##      https://prometheus.io/docs/alerting/notifications/
-  ##      https://prometheus.io/docs/alerting/notification_examples/
   tplConfig: false
 
   ## Alertmanager template files to format alerts
@@ -583,51 +550,12 @@ alertmanager:
     ## [0-9]+(ms|s|m|h) (milliseconds seconds minutes hours).
     ##
     retention: 120h
-
-    ## Storage is the definition of how storage will be used by the Alertmanager instances.
-    ## ref: https://github.com/prometheus-operator/prometheus-operator/blob/main/Documentation/user-guides/storage.md
-    ##
     storage: {}
-    # volumeClaimTemplate:
-    #   spec:
-    #     storageClassName: gluster
-    #     accessModes: ["ReadWriteOnce"]
-    #     resources:
-    #       requests:
-    #         storage: 50Gi
-    #     selector: {}
-
-
-    ## The external URL the Alertmanager instances will be available under. This is necessary to generate correct URLs. This is necessary if Alertmanager is not served from root of a DNS name. string  false
-    ##
     externalUrl:
-
-    ## The route prefix Alertmanager registers HTTP handlers for. This is useful, if using ExternalURL and a proxy is rewriting HTTP routes of a request, and the actual ExternalURL is still true,
-    ## but the server serves requests under a different route prefix. For example for use with kubectl proxy.
-    ##
     routePrefix: /
-
-    ## If set to true all actions on the underlying managed objects are not going to be performed, except for delete actions.
-    ##
     paused: false
-
-    ## Define which Nodes the Pods are scheduled on.
-    ## ref: https://kubernetes.io/docs/user-guide/node-selection/
-    ##
     nodeSelector: {}
-
-    ## Define resources requests and limits for single Pods.
-    ## ref: https://kubernetes.io/docs/user-guide/compute-resources/
-    ##
     resources: {}
-    # requests:
-    #   memory: 400Mi
-
-    ## Pod anti-affinity can prevent the scheduler from placing Prometheus replicas on the same node.
-    ## The default value "soft" means that the scheduler should *prefer* to not schedule two replica pods onto the same node but no guarantee is provided.
-    ## The value "hard" means that the scheduler is *required* to not schedule two replica pods onto the same node.
-    ## The value "" will disable pod anti-affinity so that no anti-affinity rules will be configured.
-    ##
     podAntiAffinity: ""
 
     ## If anti-affinity is enabled sets the topologyKey to use for anti-affinity.
@@ -639,40 +567,9 @@ alertmanager:
     ## ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
     ##
     affinity: {}
-    # nodeAffinity:
-    #   requiredDuringSchedulingIgnoredDuringExecution:
-    #     nodeSelectorTerms:
-    #     - matchExpressions:
-    #       - key: kubernetes.io/e2e-az-name
-    #         operator: In
-    #         values:
-    #         - e2e-az1
-    #         - e2e-az2
-
-    ## If specified, the pod's tolerations.
-    ## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
-    ##
     tolerations: []
-    # - key: "key"
-    #   operator: "Equal"
-    #   value: "value"
-    #   effect: "NoSchedule"
 
-    ## If specified, the pod's topology spread constraints.
-    ## ref: https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/
-    ##
     topologySpreadConstraints: []
-    # - maxSkew: 1
-    #   topologyKey: topology.kubernetes.io/zone
-    #   whenUnsatisfiable: DoNotSchedule
-    #   labelSelector:
-    #     matchLabels:
-    #       app: alertmanager
-
-    ## SecurityContext holds pod-level security attributes and common container settings.
-    ## This defaults to non root user with uid 1000 and gid 2000. *v1.PodSecurityContext  false
-    ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
-    ##
     securityContext:
       runAsGroup: 2000
       runAsNonRoot: true
@@ -687,19 +584,6 @@ alertmanager:
     ## Containers allows injecting additional containers. This is meant to allow adding an authentication proxy to an Alertmanager pod.
     ##
     containers: []
-    # containers:
-    # - name: oauth-proxy
-    #   image: quay.io/oauth2-proxy/oauth2-proxy:v7.3.0
-    #   args:
-    #   - --upstream=http://127.0.0.1:9093
-    #   - --http-address=0.0.0.0:8081
-    #   - ...
-    #   ports:
-    #   - containerPort: 8081
-    #     name: oauth-proxy
-    #     protocol: TCP
-    #   resources: {}
-
     # Additional volumes on the output StatefulSet definition.
     volumes: []
 
@@ -709,44 +593,16 @@ alertmanager:
     ## InitContainers allows injecting additional initContainers. This is meant to allow doing some changes
     ## (permissions, dir tree) on mounted volumes before starting prometheus
     initContainers: []
-
-    ## Priority class assigned to the Pods
-    ##
     priorityClassName: ""
-
-    ## AdditionalPeers allows injecting a set of additional Alertmanagers to peer with to form a highly available cluster.
-    ##
     additionalPeers: []
-
-    ## PortName to use for Alert Manager.
-    ##
     portName: "http-web"
-
-    ## ClusterAdvertiseAddress is the explicit address to advertise in cluster. Needs to be provided for non RFC1918 [1] (public) addresses. [1] RFC1918: https://tools.ietf.org/html/rfc1918
-    ##
     clusterAdvertiseAddress: false
-
-    ## ForceEnableClusterMode ensures Alertmanager does not deactivate the cluster mode when running with a single replica.
-    ## Use case is e.g. spanning an Alertmanager cluster across Kubernetes clusters with a single replica in each.
     forceEnableClusterMode: false
-
-    ## Minimum number of seconds for which a newly created pod should be ready without any of its container crashing for it to
-    ## be considered available. Defaults to 0 (pod will be considered available as soon as it is ready).
     minReadySeconds: 0
-
-  ## ExtraSecret can be used to store various data in an extra secret
-  ## (use it for example to store hashed basic auth credentials)
   extraSecret:
-    ## if not set, name will be auto generated
-    # name: ""
     annotations: {}
     data: {}
-  #   auth: |
-  #     foo:$apr1$OFG3Xybp$ckL0FHDAkoXYIlH9.cysT0
-  #     someoneelse:$apr1$DMZX2Z4q$6SbQIfyuLQd.xmo/P0m2c.
 
-## Using default values from https://github.com/grafana/helm-charts/blob/main/charts/grafana/values.yaml
-##
 grafana:
   enabled: true
   namespaceOverride: ""

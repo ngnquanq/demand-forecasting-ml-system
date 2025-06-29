@@ -758,7 +758,7 @@ service:
   annotationsUDP: {}
   labels: {}
   spec:
-    loadBalancerIP: ""
+    loadBalancerIP: "35.193.75.222"
   loadBalancerSourceRanges: []
   # - 192.168.0.1/32
   # - 172.16.0.0/16

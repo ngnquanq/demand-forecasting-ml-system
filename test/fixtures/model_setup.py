@@ -13,7 +13,7 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from src.data.data_loader import load_data_from_csv
+from src.data.data_loader import *
 from src.model.forecast_model import (
     run_bayesian_hyperparameter_search_and_fit,
     train_forecaster_with_best_params,
