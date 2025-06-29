@@ -188,6 +188,7 @@ kubectl create ns ingress
 kubectl create ns logging
 kubectl create ns monitoring
 kubectl create ns tracing
+kubectl create ns database
 
 # kubectl apply -f ./helm-charts/jenkins-namespace-creator-rbac.yaml
 kubectl create clusterrolebinding model-serving-admin-binding \
@@ -221,6 +222,7 @@ fi
 echo "Load balancer for application created successfully."
 echo "Promote external IP to static..."
 EXTERNAL_IP=$(kubectl get svc -n ingress traefik -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+sleep 120
 gcloud compute addresses create traefik-static-ip \
   --addresses "$EXTERNAL_IP" \
   --region "$GCP_REGION"
@@ -252,6 +254,13 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 echo "Tracing setup completed successfully."
+echo "--------------------------------------------------------"
+echo "Setup database"
+kubectl apply -f ./helm-charts/timescaledb-single/templates/init-database-configmap.yaml
+helm upgrade --install timescaledb-cluster ./helm-charts/timescaledb-single/ \
+  --namespace database\
+  -f ./helm-charts/timescaledb-single/values.yaml
+echo "Setup database successfully"
 echo "--------------------------------------------------------"
 echo "Setup logging for the application..."
 # Setup logging for the application

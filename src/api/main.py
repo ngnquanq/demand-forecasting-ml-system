@@ -290,10 +290,7 @@ async def predict_tuning_db(
         logger.error(f"Prediction (DB-based) failed due to an unhandled error: {e}")
         span.set_attribute("error", True)
         span.set_attribute("error.message", str(e))
-        # Explicitly return JSONResponse here to ensure content consistency
-        return JSONResponse(
-            status_code=500, content={"detail": str(e)}
-        )  # <--- Crucial change here
+        return JSONResponse(status_code=500, content={"detail": str(e)})
 
 
 if __name__ == "__main__":

@@ -19,6 +19,12 @@
         * [Install All Required Plugins and Setup K8s Cloud](#install-all-required-plugins-and-setup-k8s-cloud)
         * [Setup Project and Credentials](#setup-project-and-credentials)
         * [Observe the Deployment Process](#observe-the-deployment-process)
+    * [Navigate to the system's components](#navigate-to-the-system's-component)
+        * [Logging Component (Using ELK Stacks)](#logging-components)
+        * [Monitoring Component (Using Prometheus and Grafana)](#monitoring-components)
+        * [Database Component (Using TimeScaleDB - an extension of Postgres)](#database-components)
+        * [Tracing Component (Using Jaeger and OTEL)](#tracing-components)
+        
 
 
 # Introduction
@@ -66,138 +72,139 @@ Before analysis, the dataset underwent several preprocessing steps:
 
 # Repository Structure
 ```
+.
 ├── assets
-│   ├── 1.highLevelArchitecture.excalidraw
-│   ├── 2.highLevelCICDPipeline.excalidraw
-│   ├── 3.overviewSetupInfra.excalidraw
-│   ├── applicationArchitecture.png
-│   ├── application.gif
-│   ├── demonstrateELK.gif
-│   ├── demonstrateGrafana.gif
-│   ├── highLevelCICD.png
-│   ├── installPluginandCloud.gif
-│   ├── jenkinsApplication.png
-│   ├── jenkinsInstallSuggestedPlugins.png
-│   ├── jenkinsLoggingFirstTime.png
-│   ├── jenkinsReadyw.png
-│   ├── k9sResult.gif
-│   ├── setupCredentialandProjects.gif
-│   ├── setupInfraOutput.png
-│   ├── setupInfra.png
-│   ├── supplyChainTriangle.png
-│   └── testPyramid.png
+│   ├── 1.highLevelArchitecture.excalidraw
+│   ├── 2.highLevelCICDPipeline.excalidraw
+│   ├── 3.overviewSetupInfra.excalidraw
+│   ├── applicationArchitecture.png
+│   ├── application.gif
+│   ├── demonstrateELK.gif
+│   ├── demonstrateGrafana.gif
+│   ├── highLevelCICD.png
+│   ├── installPluginandCloud.gif
+│   ├── installTimeScaleDB.gif
+│   ├── installTracing.gif
+│   ├── jenkinsApplication.png
+│   ├── jenkinsInstallSuggestedPlugins.png
+│   ├── jenkinsLoggingFirstTime.png
+│   ├── jenkinsReadyw.png
+│   ├── k9sResult.gif
+│   ├── setupCredentialandProjects.gif
+│   ├── setupInfraOutput.png
+│   ├── setupInfra.png
+│   ├── supplyChainTriangle.png
+│   └── testPyramid.png
 ├── Dockerfile
+├── example.env
 ├── helm-charts
-│   ├── application
-│   │   ├── Chart.yaml
-│   │   ├── README.md
-│   │   ├── templates
-│   │   │   ├── deployment.yaml
-│   │   │   ├── NOTES.txt
-│   │   │   └── service.yaml
-│   │   └── values.yaml
-│   ├── elk
-│   │   ├── elasticsearch-values.yaml
-│   │   ├── filebeat-values.yaml
-│   │   ├── kibana-values.yaml
-│   │   └── logstash-values.yaml
-│   ├── jenkins-namespace-creator-rbac.yaml
-│   └── kube-prometheus-stack
-│       ├── Chart.lock
-│       ├── charts
-│       │   ├── grafana
-│       │   ├── kube-state-metrics
-│       │   └── prometheus-node-exporter
-│       ├── Chart.yaml
-│       ├── CONTRIBUTING.md
-│       ├── crds
-│       │   ├── crd-alertmanagerconfigs.yaml
-│       │   ├── crd-alertmanagers.yaml
-│       │   ├── crd-podmonitors.yaml
-│       │   ├── crd-probes.yaml
-│       │   ├── crd-prometheuses.yaml
-│       │   ├── crd-prometheusrules.yaml
-│       │   ├── crd-servicemonitors.yaml
-│       │   └── crd-thanosrulers.yaml
-│       ├── README.md
-│       ├── templates
-│       │   ├── alertmanager
-│       │   ├── exporters
-│       │   ├── grafana
-│       │   ├── _helpers.tpl
-│       │   ├── NOTES.txt
-│       │   ├── prometheus
-│       │   ├── prometheus-operator
-│       │   └── thanos-ruler
-│       └── values.yaml
+│   ├── application
+│   │   ├── Chart.yaml
+│   │   ├── templates
+│   │   └── values.yaml
+│   ├── elk
+│   │   ├── elasticsearch
+│   │   ├── filebeat
+│   │   ├── kibana
+│   │   └── logstash
+│   ├── jaeger
+│   │   ├── Chart.lock
+│   │   ├── charts
+│   │   ├── Chart.yaml
+│   │   ├── README.md
+│   │   ├── templates
+│   │   └── values.yaml
+│   ├── kube-prometheus-stack
+│   │   ├── Chart.lock
+│   │   ├── charts
+│   │   ├── Chart.yaml
+│   │   ├── CONTRIBUTING.md
+│   │   ├── crds
+│   │   ├── README.md
+│   │   ├── templates
+│   │   └── values.yaml
+│   ├── timescaledb-single
+│   │   ├── admin-guide.md
+│   │   ├── Chart.yaml
+│   │   ├── ci
+│   │   ├── docs
+│   │   ├── examples
+│   │   ├── README.md
+│   │   ├── README.md.gotmpl
+│   │   ├── requirements.lock
+│   │   ├── requirements.yaml
+│   │   ├── scripts
+│   │   ├── templates
+│   │   ├── UPDATES.md
+│   │   ├── upgrade-guide.md
+│   │   ├── values
+│   │   ├── values.schema.yaml
+│   │   └── values.yaml
+│   └── traefik
+│       ├── Changelog.md
+│       ├── Chart.yaml
+│       ├── crds
+│       ├── EXAMPLES.md
+│       ├── Guidelines.md
+│       ├── LICENSE
+│       ├── README.md
+│       ├── templates
+│       ├── VALUES.md
+│       ├── values.schema.json
+│       └── values.yaml
 ├── infrastructure
-│   ├── config
-│   │   ├── Dockerfile
-│   │   ├── inventory
-│   │   ├── jenkins.yml
-│   │   └── playbook
-│   │       ├── files
-│   │       ├── jenkins-setup.yaml
-│   │       └── k8s-setup.yaml
-│   ├── provision
-│   │   ├── main.tf
-│   │   ├── outputs.tf
-│   │   ├── terraform.tfstate
-│   │   ├── terraform.tfstate.backup
-│   │   ├── terraform.tfvars
-│   │   ├── variables.tf
-│   │   └── versions.tf
-│   └── README.md
+│   ├── jenkins
+│   │   ├── Dockerfile
+│   │   ├── inventory
+│   │   └── jenkins.yml
+│   └── terraform
+│       ├── main.tf
+│       ├── outputs.tf
+│       ├── terraform.tfstate
+│       ├── terraform.tfstate.backup
+│       ├── variables.tf
+│       └── versions.tf
+├── jenkins
+│   └── scripts
+│       └── deployApp.groovy
 ├── Jenkinsfile
 ├── notebooks
-│   ├── data_test.csv
-│   ├── main.ipynb
-│   └── test_splits
-│       ├── test_10.csv
-│       ├── test_11.csv
-│       ├── test_12.csv
-│       ├── test_13.csv
-│       ├── test_14.csv
-│       ├── test_1.csv
-│       ├── test_2.csv
-│       ├── test_3.csv
-│       ├── test_4.csv
-│       ├── test_5.csv
-│       ├── test_6.csv
-│       ├── test_7.csv
-│       ├── test_8.csv
-│       └── test_9.csv
+│   └── main.ipynb
 ├── playground
-│   └── main.py
+│   ├── data_connect.py
+│   ├── main.ipynb
+│   └── main.py
+├── pyproject.toml
 ├── README.md
 ├── requirements.txt
 ├── setup_infra.sh
-└── src
-    ├── api
-    │   ├── __init__.py
-    │   └── main.py
-    ├── data
-    │   ├── data_loader.py
-    │   └── __init__.py
-    ├── __init__.py
-    ├── logging.conf
-    ├── model
-    │   └── forecast_model.py
-    ├── static
-    │   ├── index.html
-    │   └── script.js
-    └── test
-        ├── integration
-        │   ├── conftest.py
-        │   ├── __init__.py
-        │   ├── test_1.csv
-        │   └── test_main.py
-        └── unit
-            ├── conftest.py
-            ├── __init__.py
-            ├── test_1.csv
-            ├── test_api_behavior.py
-            └── test_model_accuracy.py
+├── src
+│   ├── api
+│   │   ├── __init__.py
+│   │   └── main.py
+│   ├── data
+│   │   ├── data_loader.py
+│   │   └── __init__.py
+│   ├── __init__.py
+│   ├── logging.conf
+│   ├── model
+│   │   └── forecast_model.py
+│   └── static
+│       ├── index.html
+│       └── script.js
+└── test
+    ├── conftest.py
+    ├── fixtures
+    │   └── model_setup.py
+    ├── integration
+    │   ├── __init__.py
+    │   ├── test_db_retrieval.py
+    │   └── test_main.py
+    ├── test_data.csv
+    └── unit
+        ├── __init__.py
+        ├── test_function_behavior.py
+        └── test_model_accuracy.py
 ```
 
 # High-level system architecture
@@ -215,11 +222,12 @@ Basically, what we are trying to do the following steps are following this pipel
 
 ## Requirements
 Since the application is being made on cloud, make sure to have google cloud and that you have enough credits. Additionally, we need things like:
-- google cloud cli (mainly for interacting with GCP services)
-- kubernetes (for deploying application)
-- terraform (for building services (i.e Google Compute Engine or Google Kubernetes Engine))
-- k9s (a very powerful tool for )
-- ansible 
+- Google cloud cli (mainly for interacting with GCP services)
+- Kubernetes (for deploying application)
+- Terraform (for building services (i.e Google Compute Engine or Google Kubernetes Engine))
+- K9s (a very powerful tool for visualize cluster operations)
+- Ansible (for configuring apps on servers - often used with Terraform)
+- DBeaver (free and multi-platform database tool and SQL client, nice UI as well)
 ## Setup the environment variable
 We need to use these credential later on in the project, therefore I recommend to store it in the ```.env``` file and use it later. 
 
@@ -250,6 +258,10 @@ After that, follow the steps the output on the console, finally you will have so
 
 Now you can access to the link, use the initial passowrd to login Jenkins server. 
 
+You can manually run kubectl with watch command, but K9s is better because it shows the overall picture. Here is the overview of what kubectl is doing when the script is running:
+
+![](/assets/k9sResult.gif)
+
 ## Setup our project on Jenkins
 After the script has done successfully, we need to access to Jenkins and setup our project on it, just like this:
 
@@ -271,8 +283,8 @@ After that, Jenkins is ready to use:
 
 These plugins need to be install so that the code run successfully:
   - Kubernetes (To use k8s)
+  - Docker (We use this to pull python image, install some libraries and do pytest, after that we remove this container to clear up some spaces)
   - Discord Notifier (To send message into discord server)
-  - Pyenv Pipeline (To run python script)
 
 You can follow this video for more detail
 
@@ -305,10 +317,26 @@ You can go to the link and use the application just like this:
 
 ![](/assets/application.gif)
 
+## Navigate to the system's Component
+### Logging Components
 Additionally, we can use the port-forwarding to access Kibana for more observes on the application's logs (The password is in the output console of our Jenkinsfile)
 
 ![](/assets/demonstrateELK.gif)
 
+### Monitoring Components
 And also Grafana to have overview of our entire system 
 
 ![](/assets/demonstrateGrafana.gif)
+
+### Database Components
+Additionally, we can also query in the database (eventhough this is quite slow.). Since this is heavily based on time series, we decide to use TimeScaleDB, which is an extensions of Postgres but being built for TimeSeries data, for more information, please refer to this link: [TimeScaleDB - from TigerData](https://www.tigerdata.com/)
+
+For simplicity, we create a k8s config map with a small sample of data to ingest into the database right after it is created.
+
+![](/assets/installTimeScaleDB.gif)
+
+### Tracing Components
+
+Finally is using Jaeger to create and observe trace of an API (like an entire thing, from getting the data, tuning, and predict). This is very useful when we are trying to figure out which steps that tooks lots of time so that we can prevent it just in time. 
+
+![](/assets/installTracing.gif)
