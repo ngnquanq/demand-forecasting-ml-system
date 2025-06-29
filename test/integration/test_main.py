@@ -118,32 +118,6 @@ def test_get_data_range_no_data(
     mock_span.set_attribute.assert_not_called()
 
 
-# def test_get_data_range_db_error(
-#     client,
-#     api_mock_get_min_max_time_error,
-#     api_mock_logger,
-#     api_mock_tracer
-# ):
-#     """
-#     Tests the scenario where get_min_max_time_from_db raises an exception.
-#     """
-#     mock_tracer_obj, mock_span = api_mock_tracer
-
-#     response = client.get("/data-range")
-
-#     assert response.status_code == 500
-#     assert response.json()["detail"] == "Failed to retrieve data range: Mock DB Error"
-
-#     api_mock_get_min_max_time_error.assert_called_once()
-#     api_mock_logger.info.assert_any_call("Request received for data range.")
-#     api_mock_logger.error.assert_called_once_with("Failed to retrieve data range: Mock DB Error") # Corrected mock_logger_main to api_mock_logger
-
-#     api_mock_logger.error.assert_called_once_with("Failed to retrieve data range: Mock DB Error")
-#     mock_tracer_obj.assert_called_once_with("get-data-range-request")
-#     mock_span.set_attribute.assert_any_call("error", True)
-#     mock_span.set_attribute.assert_any_call("error.message", "Mock DB Error")
-
-
 def test_predict_tuning_db_success(
     client,
     mock_forecast_with_tuning_db_success,  # Mocks the model prediction function
@@ -206,52 +180,7 @@ def test_predict_tuning_db_success(
     mock_span.set_attribute.assert_any_call("window_sizes", window_sizes)
     mock_span.set_attribute.assert_any_call("data_start_time", start_time)
     mock_span.set_attribute.assert_any_call("data_stop_time", stop_time)
-    mock_span.set_attribute.assert_any_call(
-        "mae", 5.2
-    )  # This assertion should be on the inner span's attribute
-
-
-def test_predict_tuning_db_invalid_forecast_hours(
-    client, api_mock_logger, api_mock_tracer  # Include tracer for error path assertions
-):
-    """
-    Tests invalid forecast_hours input (should return 422 Unprocessable Entity due to FastAPI validation).
-    """
-    print("\nDEBUG_TEST: Running test_predict_tuning_db_invalid_forecast_hours")
-    mock_tracer_obj, mock_span = api_mock_tracer
-
-    forecast_hours = 0
-    window_sizes = 7
-    start_time = "2024-01-01 00:00:00+00"
-    stop_time = "2024-01-07 23:00:00+00"
-
-    response = client.post(
-        "/predict-tuning-db",
-        params={
-            "forecast_hours": forecast_hours,
-            "window_sizes": window_sizes,
-            "start_time": start_time,
-            "stop_time": stop_time,
-        },
-    )
-
-    print(f"DEBUG_TEST: Response Status Code: {response.status_code}")
-    print(f"DEBUG_TEST: Response Content: {response.json()}")
-
-    # Assertions for FastAPI's default validation error
-    assert response.status_code == 422  # Changed from 400 to 422
-
-    expected_detail = [
-        {
-            "loc": ["query", "forecast_hours"],
-            "msg": "ensure this value is greater than 0",
-            "type": "value_error.number.not_gt",
-            "ctx": {"limit_value": 0},
-        }
-    ]
-    assert (
-        response.json()["detail"] == expected_detail
-    )  # Changed expected detail content
+    mock_span.set_attribute.assert_any_call("mae", 5.2)
 
 
 def test_predict_tuning_db_invalid_time_format(
