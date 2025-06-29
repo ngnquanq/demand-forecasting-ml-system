@@ -4,7 +4,7 @@ pipeline {
     environment {
         // Dynamic app tag based on build number
         application_registry            = 'ngnquanq/demand-forecasting'
-        application_tag                  = "v${env.BUILD_NUMBER}"
+        application_tag                  = "v${env.BUILD_NUMBER} - ${new Date().format('yyyyMMdd')}"
 
         jenkins_registry                = 'ngnquanq/custom-jenkins'
         jenkins_tag                     = "1.0.0"
@@ -37,9 +37,9 @@ pipeline {
                         returnStatus: true
                     )
                     if (status != 0) {
-                        error "❌ Tests failed or coverage below 66% (exit code: ${status})"
+                        error "❌ Tests failed (exit code: ${status})"
                     }
-                    echo '✅ All tests passed and coverage ≥ 66%'
+                    echo '✅ All tests passed'
                 }
             }
         }
