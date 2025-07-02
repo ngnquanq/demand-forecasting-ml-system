@@ -1,19 +1,7 @@
-import io
-import os
-import sys
-
-import numpy as np
-import pandas as pd
-import pytest
-from fastapi import HTTPException, UploadFile
-from sklearn.compose import make_column_selector, make_column_transformer
 from sklearn.metrics import mean_absolute_error
-from sklearn.preprocessing import OrdinalEncoder
-
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
-def test_mae_is_larger_than_100(prepared_model_and_data):
+def test_mae_is_smaller_than_100(prepared_model_and_data):
     """
     Tests if the Mean Absolute Error (MAE) of the model's predictions
     is strictly greater than 100. (the number here is arbitrary and can be adjusted

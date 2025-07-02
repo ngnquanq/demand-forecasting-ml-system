@@ -1,27 +1,20 @@
 # test/conftest.py
-
+import io
 import os
-import sys
-from datetime import timedelta, tzinfo
+from datetime import datetime, timedelta, tzinfo
 from io import BytesIO
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import numpy as np
 import pandas as pd
 import pytest
 from fastapi import UploadFile
-from fixtures.model_setup import prepare_model_and_data
-from psycopg2 import Error, OperationalError
-
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import json
-from datetime import datetime, timezone
-
-from fastapi import HTTPException
 from fastapi.testclient import TestClient
+from fixtures.model_setup import prepare_model_and_data
+from psycopg2 import OperationalError
 
 from src.api.main import app
-from src.data.data_loader import *
 
 DEFAULT_DB_HOST = "localhost"
 DEFAULT_DB_NAME = "test_db"
@@ -152,16 +145,6 @@ def mock_get_data_as_dataframe_filtered():
     This mock DataFrame will be sufficiently long to cover training, validation,
     and a future prediction period.
     """
-    # Define a long enough period for your mock data
-    # start_time = "2012-09-01 00:00:00+0700"
-    # stop_time = "2012-09-29 23:00:00+0700"
-    # forecast_hours = 24
-    # The 'stop_time' in the test is what limits the initial data fetch.
-    # We need the *mocked data* to go beyond that stop_time by at least `forecast_hours`.
-
-    # Let's make the mock data span a longer period, e.g., 600 hours (approx 25 days)
-    # This ensures there's enough 'future' data for `real_users` lookup, even if
-    # it's not truly future data in a real scenario.
     num_records = 600  # Sufficiently large number of hours
 
     start_dt_mock = pd.to_datetime("2012-09-01 00:00:00+0700")
@@ -242,104 +225,6 @@ def mock_np_ceil():
     with patch("numpy.ceil") as mock:
         mock.side_effect = np.ceil  # Still call original np.ceil logic
         yield mock
-
-
-@pytest.fixture
-def sample_csv_content_success():
-    """
-    Provides valid CSV content as a string for successful loading tests.
-    """
-    base_data = (
-        "date_time,users,holiday,weather,temp,atemp,hum,windspeed\n"
-        "2012-09-01 00:00:00+0700,168,0,clear,30.34,34.09,62,7.0015\n"
-        "2012-09-01 01:00:00+0700,79,0,clear,29.52,34.85,74,8.9981\n"
-        "2012-09-01 02:00:00+0700,69,0,clear,28.7,32.575,70,11.0014\n"
-        "2012-09-01 03:00:00+0700,35,0,clear,28.7,32.575,70,7.0015\n"
-        "2012-09-01 04:00:00+0700,12,0,clear,28.7,32.575,70,0\n"
-        "2012-09-01 05:00:00+0700,22,0,clear,27.88,31.82,79,0\n"
-        "2012-09-01 06:00:00+0700,36,0,clear,27.88,31.82,79,0\n"
-    )
-    all_rows = base_data.splitlines()[1:]  # Skip header
-    extended_rows = []
-    current_dt = pd.to_datetime(
-        "2012-09-01 00:00:00+0700", utc=True
-    )  # Start in UTC to handle +0700 correctly
-
-    for i in range(720):  # Generate 720 hours (approx 30 days)
-        # Create a new row based on the first few sample hours, but increment date/time
-        # and slightly vary numerical values for realism
-        original_row_idx = i % (len(all_rows))
-        parts = all_rows[original_row_idx].split(",")
-
-        # Increment time
-        new_dt = current_dt + pd.Timedelta(hours=i)
-        # Convert back to +0700 for the CSV string (important for parsing with tz)
-        new_dt_str = new_dt.tz_convert("Asia/Ho_Chi_Minh").strftime(
-            "%Y-%m-%d %H:%M:%S%z"
-        )
-
-        # Slightly vary numbers (e.g., users, temp)
-        new_users = int(parts[1]) + np.random.randint(-10, 10)
-        new_users = max(1, new_users)  # Ensure users don't go below 1
-        new_temp = float(parts[4]) + np.random.uniform(-1.0, 1.0)
-
-        new_row = f"{new_dt_str},{new_users},{parts[2]},{parts[3]},{new_temp:.2f},{parts[5]},{parts[6]},{parts[7]}\n"
-        extended_rows.append(new_row)
-
-    full_csv_content = base_data.splitlines()[0] + "\n" + "".join(extended_rows)
-    return full_csv_content.encode("utf-8")
-
-
-@pytest.fixture
-def mock_get_data_as_dataframe_filtered(sample_csv_content_success):
-    """
-    Mocks the database data loading function to return a DataFrame
-    parsed from the sample_csv_content_success fixture.
-    """
-    mock = MagicMock()
-
-    # Decode the bytes content to a string and use StringIO
-    csv_string = sample_csv_content_success.decode("utf-8")
-    data_df = pd.read_csv(
-        StringIO(csv_string), parse_dates=["date_time"], index_col="date_time"
-    )
-    data_df.index = pd.to_datetime(data_df.index, utc=True)
-
-    mock.return_value = data_df.copy()
-    with patch("src.api.main.get_data_as_dataframe_filtered", new=mock):
-        yield mock
-
-
-@pytest.fixture
-def mock_forecast_with_tuning_db_success():
-    """
-    Mocks src.api.main.forecast_with_tuning_db for success.
-    """
-    mock_df = pd.DataFrame(
-        {
-            "timestamp": pd.to_datetime(
-                ["2024-01-01 00:00:00+00", "2024-01-01 01:00:00+00"], utc=True
-            ),
-            "prediction": [100.0, 105.0],
-        }
-    ).set_index("timestamp")
-    mock_mae = 5.2
-    with patch(
-        "src.api.main.forecast_with_tuning_db", return_value=(mock_df, mock_mae)
-    ) as mock_func:
-        yield mock_func
-
-
-@pytest.fixture
-def mock_forecast_with_tuning_db_error():
-    """
-    Mocks src.api.main.forecast_with_tuning_db to raise an exception.
-    """
-    with patch(
-        "src.api.main.forecast_with_tuning_db",
-        side_effect=ValueError("Simulated DB forecast error"),
-    ) as mock_func:
-        yield mock_func
 
 
 @pytest.fixture
@@ -632,11 +517,6 @@ def prepared_model_and_data(csv_file_path):
 
 
 @pytest.fixture
-def client():
-    return TestClient(app)
-
-
-@pytest.fixture
 def sample_csv_content_success():
     """Provides valid CSV content for successful loading tests."""
     return (
@@ -678,3 +558,76 @@ def sample_csv_content_missing_values():
 def sample_csv_content_empty_strings():
     """Provides CSV content with empty strings."""
     return b"date_time,weather\n" b"2012-09-01 00:00:00,\n" b"2012-09-01 01:00:00,clear"
+
+
+@pytest.fixture
+def dataframe_from_csv(sample_csv_content_success):
+    """Load the sample CSV into a pandas DataFrame."""
+    csv_io = io.BytesIO(sample_csv_content_success)
+    df = pd.read_csv(
+        csv_io, parse_dates=["date_time"], index_col="date_time", encoding="utf-8"
+    )
+    df.index = pd.to_datetime(df.index, utc=True)  # ensure timezone awareness
+    return df
+
+
+@pytest.fixture
+def mock_exog_pred():
+    index = pd.date_range("2025-01-01 00:00", periods=3, freq="h", tz="UTC")
+    return pd.DataFrame(
+        {"temp": [22.5, 23.1, 24.0], "humidity": [60, 58, 59]}, index=index
+    )
+
+
+@pytest.fixture
+def mock_predictions():
+    return pd.Series([100.4, 150.2, 130.6])
+
+
+@pytest.fixture
+def mock_data_with_users():
+    index = pd.date_range("2025-01-01 00:00", periods=10, freq="h", tz="UTC")
+    return pd.DataFrame(
+        {
+            "users": [80, 90, 100, 110, 120, 130, 140, 150, 160, 170],
+            "temp": np.random.rand(10),
+            "humidity": np.random.rand(10),
+        },
+        index=index,
+    )
+
+
+@pytest.fixture
+def fake_forecast_model(mock_predictions):
+    class FakeModel:
+        def predict(self, steps, exog=None):
+            assert exog is not None
+            return mock_predictions[:steps]
+
+    return FakeModel()
+
+
+@pytest.fixture
+def mock_predict_future():
+    with patch("src.model.forecast_model.predict_future") as mock:
+        mock_predictions = pd.Series(
+            [100.0, 110.0, 120.0],
+            index=pd.date_range("2025-01-01", periods=3, freq="H", tz="UTC"),
+        )
+        mock_exog = pd.DataFrame(
+            {"temp": [23, 24, 25], "humidity": [50, 55, 60]},
+            index=mock_predictions.index,
+        )
+        mock.return_value = (mock_predictions, mock_exog, mock_predictions.index)
+        yield mock
+
+
+@pytest.fixture
+def mock_combine_forecast_with_truth():
+    with patch("src.model.forecast_model.combine_forecast_with_truth") as mock:
+        mock_df = pd.DataFrame(
+            {"real_users": [100, 110, 120], "predicted_users": [98, 111, 119]},
+            index=pd.date_range("2025-01-01", periods=3, freq="H", tz="UTC"),
+        )
+        mock.return_value = mock_df
+        yield mock

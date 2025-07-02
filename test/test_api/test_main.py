@@ -1,11 +1,4 @@
-import os
-import sys
-
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import pandas as pd
-from fastapi.testclient import TestClient
-
-from src.api.main import app
 
 
 def test_read_root(client):
@@ -172,8 +165,6 @@ def test_predict_tuning_db_success(
         "Forecast tuning (DB-based) completed successfully.", mae=5.2
     )
 
-    # Tracer assertions
-    # Note: start_as_current_span is called twice, mock_tracer_obj.start_as_current_span.call_args_list can verify both
     mock_tracer_obj.assert_any_call("predict-tuning-db-request")
     mock_tracer_obj.assert_any_call("forecast-with-tuning-db")
     mock_span.set_attribute.assert_any_call("forecast_hours", forecast_hours)
@@ -246,9 +237,7 @@ def test_predict_tuning_db_backend_error(
     Tests a scenario where the forecast_with_tuning_db function raises an exception (500 Internal Server Error).
     """
     print("\nDEBUG_TEST: Running test_predict_tuning_db_backend_error")
-    mock_tracer_obj, mock_span = (
-        api_mock_tracer  # mock_tracer_obj is the mock for tracer.start_as_current_span
-    )
+    mock_tracer_obj, mock_span = api_mock_tracer
 
     forecast_hours = 24
     window_sizes = 7
@@ -276,13 +265,10 @@ def test_predict_tuning_db_backend_error(
         "Prediction (DB-based) failed due to an unhandled error: Simulated DB forecast error"
     )
 
-    # FIX: Use assert_any_call for both expected calls to tracer.start_as_current_span
-    # And assert the total call count if you want to be strict about only these two calls
     mock_tracer_obj.assert_any_call("predict-tuning-db-request")
     mock_tracer_obj.assert_any_call("forecast-with-tuning-db")
     assert mock_tracer_obj.call_count == 2  # Verify exactly two calls happened
 
-    # Assertions on the span (which is the mock returned by the context manager)
     mock_span.set_attribute.assert_any_call("error", True)
     mock_span.set_attribute.assert_any_call(
         "error.message", "Simulated DB forecast error"
