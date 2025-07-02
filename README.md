@@ -99,32 +99,19 @@ Before analysis, the dataset underwent several preprocessing steps:
 ├── requirements.txt
 ├── setup_infra.sh                          # Setup scripts to setup all the components
 ├── src/                                    # Application source code
-│   ├── api/
-│   │   ├── __init__.py
-│   │   └── main.py
-│   ├── data/
-│   │   ├── data_loader.py
-│   │   └── __init__.py
-│   ├── __init__.py
-│   ├── logging.conf
-│   ├── model/
-│   │   └── forecast_model.py
-│   └── static/
-│       ├── index.html
-│       └── script.js
+│   ├── api/                                # API of applicaion
+│   ├── data/                               # Data preparation
+│   ├── model/                              # Model's logic
+│   └── static/                             # Simple front end
 └── test/                                   # Code to test application before release
-    ├── conftest.py
-    ├── fixtures/
-    │   └── model_setup.py
-    ├── integration/
-    │   ├── __init__.py
-    │   ├── test_db_retrieval.py
-    │   └── test_main.py
-    ├── test_data.csv
-    └── unit/
-        ├── __init__.py
-        ├── test_function_behavior.py
-        └── test_model_accuracy.py
+    ├── conftest.py                         
+    ├── data
+    ├── fixtures
+    ├── model
+    ├── __pycache__
+    ├── test_api
+    └── test_data.csv
+
 ```
 
 # High-level system architecture
