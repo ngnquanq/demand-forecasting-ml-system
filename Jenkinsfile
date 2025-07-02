@@ -26,6 +26,9 @@ pipeline {
                     args '-u 0'
                 }
             }
+            environment {
+                ENV = 'test'
+            }
             steps {
                 script {
                     echo '🔍 Running tests with coverage guard…'
@@ -33,7 +36,7 @@ pipeline {
                     sh 'python --version'
                     sh 'python -m pip install -r requirements.txt'
                     def status = sh(
-                        script: 'python -m pytest --cov=src --cov-fail-under=66',
+                        script: 'python -m pytest --cov=src --cov-fail-under=80',
                         returnStatus: true
                     )
                     if (status != 0) {
@@ -44,20 +47,18 @@ pipeline {
             }
         }
         
-        stage('Build') {
+        stage('Build and Push') {
             steps {
                 script {
-                    echo 'Building Docker image model image...'
+                    echo '🔨 Building Docker image for application...'
                     sh "docker build -t ${application_registry}:${application_tag} ."
-                    echo 'Building Docker image jenkins image...'
-                    sh "docker build -t ${jenkins_registry}:${jenkins_tag} ./infrastructure/jenkins/" 
-                }
-            }
-        }
+                    echo '🏷️ Tagging application image as latest...'
+                    sh "docker tag ${application_registry}:${application_tag} ${application_registry}:latest"
 
-        stage('Push') {
-            steps {
-                script {
+                    echo '🔨 Building Docker image for Jenkins...'
+                    sh "docker build -t ${jenkins_registry}:${jenkins_tag} ./infrastructure/jenkins/"
+
+                    echo '📤 Logging in to DockerHub and pushing images...'
                     withCredentials([
                         usernamePassword(
                             credentialsId: 'dockerhub',
@@ -67,11 +68,14 @@ pipeline {
                     ]) {
                         sh "echo ${DOCKER_PASS} | docker login -u ${DOCKER_USER} --password-stdin"
                         sh "docker push ${application_registry}:${application_tag}"
-                        echo '✅ Docker images pushed successfully!'
+                        sh "docker push ${application_registry}:latest"
+                        echo '✅ Application images pushed successfully!'
                     }
                 }
             }
         }
+
+
 
 
         stage('Deploy the main application') {
@@ -79,7 +83,7 @@ pipeline {
                 kubernetes {
                     containerTemplate {
                         name 'helm'
-                        image "${jenkins_registry}:${jenkins_tag}" // Your Jenkins/Helm tools image
+                        image "${jenkins_registry}:${jenkins_tag}" 
                         alwaysPullImage true
                     }
                 }

@@ -37,3 +37,5 @@ spec:
             - name: DB_PASSWORD
               value: {{ .Values.database.environmentVariables.DB_PASSWORD | quote }}
             {{- end }}
+            - name: ENV
+              value: {{ .Values.tracing.env | quote }}

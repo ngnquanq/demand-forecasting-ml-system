@@ -73,7 +73,7 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 echo "Running Ansible playbook to install Jenkins and Docker..."
-ansible-playbook -i inventory jenkins.yml
+ansible-playbook -i inventory playbook.yml
 echo "Jenkins and Docker installed successfully."
 # Return to the infra directory
 cd ../

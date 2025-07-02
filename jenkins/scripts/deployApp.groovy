@@ -20,6 +20,7 @@ def call(env, applicationImageWithTag) {
             --namespace ${namespace} \\
             --set image.repository=${repository} \\
             --set image.tag=${tag} \\
+            --set image.pullPolicy=Always \\
             --wait 
     """
     echo "Helm deployment/upgrade complete."

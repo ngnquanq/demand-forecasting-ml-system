@@ -73,135 +73,55 @@ Before analysis, the dataset underwent several preprocessing steps:
 # Repository Structure
 ```
 .
-├── assets
-│   ├── 1.highLevelArchitecture.excalidraw
-│   ├── 2.highLevelCICDPipeline.excalidraw
-│   ├── 3.overviewSetupInfra.excalidraw
-│   ├── applicationArchitecture.png
-│   ├── application.gif
-│   ├── demonstrateELK.gif
-│   ├── demonstrateGrafana.gif
-│   ├── highLevelCICD.png
-│   ├── installPluginandCloud.gif
-│   ├── installTimeScaleDB.gif
-│   ├── installTracing.gif
-│   ├── jenkinsApplication.png
-│   ├── jenkinsInstallSuggestedPlugins.png
-│   ├── jenkinsLoggingFirstTime.png
-│   ├── jenkinsReadyw.png
-│   ├── k9sResult.gif
-│   ├── setupCredentialandProjects.gif
-│   ├── setupInfraOutput.png
-│   ├── setupInfra.png
-│   ├── supplyChainTriangle.png
-│   └── testPyramid.png
-├── Dockerfile
-├── example.env
+├── assets/                                 # This folder contain all image, gif that is being used by the README.md
+├── Dockerfile                              # This is the Dockerfile of the main application (aka the src/)
+├── example.env                             
 ├── helm-charts
-│   ├── application
-│   │   ├── Chart.yaml
-│   │   ├── templates
-│   │   └── values.yaml
-│   ├── elk
-│   │   ├── elasticsearch
-│   │   ├── filebeat
-│   │   ├── kibana
-│   │   └── logstash
-│   ├── jaeger
-│   │   ├── Chart.lock
-│   │   ├── charts
-│   │   ├── Chart.yaml
-│   │   ├── README.md
-│   │   ├── templates
-│   │   └── values.yaml
-│   ├── kube-prometheus-stack
-│   │   ├── Chart.lock
-│   │   ├── charts
-│   │   ├── Chart.yaml
-│   │   ├── CONTRIBUTING.md
-│   │   ├── crds
-│   │   ├── README.md
-│   │   ├── templates
-│   │   └── values.yaml
-│   ├── timescaledb-single
-│   │   ├── admin-guide.md
-│   │   ├── Chart.yaml
-│   │   ├── ci
-│   │   ├── docs
-│   │   ├── examples
-│   │   ├── README.md
-│   │   ├── README.md.gotmpl
-│   │   ├── requirements.lock
-│   │   ├── requirements.yaml
-│   │   ├── scripts
-│   │   ├── templates
-│   │   ├── UPDATES.md
-│   │   ├── upgrade-guide.md
-│   │   ├── values
-│   │   ├── values.schema.yaml
-│   │   └── values.yaml
-│   └── traefik
-│       ├── Changelog.md
-│       ├── Chart.yaml
-│       ├── crds
-│       ├── EXAMPLES.md
-│       ├── Guidelines.md
-│       ├── LICENSE
-│       ├── README.md
-│       ├── templates
-│       ├── VALUES.md
-│       ├── values.schema.json
-│       └── values.yaml
+│   ├── application/                        # Main application helm chart
+│   ├── elk/                                
+│   │   ├── elasticsearch/                  # elasticsearch helm chart
+│   │   ├── filebeat/                       # filebeat helm chart
+│   │   ├── kibana/                         # kibana helm chart
+│   │   └── logstash/                       # logstash helm chart
+│   ├── jaeger                              # jaeger helm chart
+│   ├── kube-prometheus-stack/              # prometheus and grafana helm chart
+│   ├── timescaledb-single/                 # traefik helm chart
+│   └── traefik/
 ├── infrastructure
-│   ├── jenkins
-│   │   ├── Dockerfile
-│   │   ├── inventory
-│   │   └── jenkins.yml
-│   └── terraform
-│       ├── main.tf
-│       ├── outputs.tf
-│       ├── terraform.tfstate
-│       ├── terraform.tfstate.backup
-│       ├── variables.tf
-│       └── versions.tf
-├── jenkins
-│   └── scripts
-│       └── deployApp.groovy
-├── Jenkinsfile
-├── notebooks
+│   ├── jenkins/                            # Ansible folder to build jenkins container
+│   └── terraform/                          # Terraform folder to build infrastructure i.e VM, K8s cluster
+├── jenkins /
+│   └── scripts/                            # Scripts that will be import into Jenkins pipeline
+├── Jenkinsfile                                 
+├── notebooks/                               # To test model and model configuration
 │   └── main.ipynb
-├── playground
-│   ├── data_connect.py
-│   ├── main.ipynb
-│   └── main.py
-├── pyproject.toml
 ├── README.md
 ├── requirements.txt
-├── setup_infra.sh
-├── src
-│   ├── api
+├── setup_infra.sh                          # Setup scripts to setup all the components
+├── src/                                    # Application source code
+│   ├── api/
 │   │   ├── __init__.py
 │   │   └── main.py
-│   ├── data
+│   ├── data/
 │   │   ├── data_loader.py
 │   │   └── __init__.py
 │   ├── __init__.py
 │   ├── logging.conf
-│   ├── model
+│   ├── model/
 │   │   └── forecast_model.py
-│   └── static
+│   └── static/
 │       ├── index.html
 │       └── script.js
-└── test
+└── test/                                   # Code to test application before release
     ├── conftest.py
-    ├── fixtures
+    ├── fixtures/
     │   └── model_setup.py
-    ├── integration
+    ├── integration/
     │   ├── __init__.py
     │   ├── test_db_retrieval.py
     │   └── test_main.py
     ├── test_data.csv
-    └── unit
+    └── unit/
         ├── __init__.py
         ├── test_function_behavior.py
         └── test_model_accuracy.py
