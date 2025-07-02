@@ -16,17 +16,13 @@ from skforecast.recursive import ForecasterRecursive
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.data.data_loader import *
-from src.model.forecast_model import *
+from src.data.data_loader import create_encoder, load_data_from_csv, load_data_from_db
+from src.data.postprocessing import combine_forecast_with_truth
+from src.data.preprocessing import extract_target_and_exog, prepare_time_series_data
+from src.data.validation import *
+from src.model.predict_utils import *
 
-tracer = trace.get_tracer(__name__)
-DB_HOST = os.getenv("DB_HOST", "localhost")
-DB_NAME = os.getenv("DB_NAME", "postgres")
-DB_USER = os.getenv("DB_USER", "postgres")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "password")  # WARNING: Insecure for prod
-SCHEMA_NAME = os.getenv("DB_SCHEMA", "application")
-TABLE_NAME = os.getenv("DB_TABLE", "feature")
-TIME_COLUMN = "date_time"
+tracer = trace.get_tracer("application.tracer")
 
 
 def run_bayesian_hyperparameter_search_and_fit(
@@ -286,240 +282,55 @@ def forecast_with_tuning(file: UploadFile, forecast_hours: int, window_sizes: in
 def forecast_with_tuning_db(
     forecast_hours: int, window_sizes: int, start_time: str, stop_time: str
 ):
-    current_tracer = (
-        trace.get_tracer("application.tracer") if trace.get_tracer_provider() else None
-    )
-    span_context_manager = (
-        current_tracer.start_as_current_span("forecast_with_tuning_db")
-        if current_tracer
-        else (lambda: None).__enter__() and (lambda: None).__exit__
-    )
-
-    with span_context_manager as root_span:
+    with tracer.start_as_current_span("forecast_with_tuning_db") as root_span:
         # Step 1: Load data from PostgreSQL
-        if current_tracer:
-            with current_tracer.start_as_current_span("load-data-from-db"):
-                logger.info(
-                    "Loading data from database.",
-                    db_start_time=start_time,
-                    db_stop_time=stop_time,
-                )
-                data = get_data_as_dataframe_filtered(
-                    host=DB_HOST,
-                    database=DB_NAME,
-                    user=DB_USER,
-                    password=DB_PASSWORD,
-                    schema_name=SCHEMA_NAME,
-                    table_name=TABLE_NAME,
-                    time_column=TIME_COLUMN,
-                    start_time=start_time,
-                    stop_time=stop_time,
-                )
-                if data is None or data.empty:
-                    logger.error(
-                        "No data loaded from the database for the specified time range."
-                    )
-                    raise ValueError(
-                        "No data loaded from the database for the specified time range."
-                    )
-                logger.info(f"Data loaded successfully. Shape: {data.shape}")
-
-        if current_tracer:
-            with current_tracer.start_as_current_span("prepare-time-series-index"):
-                # 1. Ensure index is a DatetimeIndex
-                if not isinstance(data.index, pd.DatetimeIndex):
-                    logger.warning(
-                        "DataFrame index is not DatetimeIndex. Attempting conversion."
-                    )
-                    data.index = pd.to_datetime(
-                        data.index, utc=True
-                    )  # Assuming UTC, adjust if your DB times are local
-
-                # 2. Sort the index (crucial for time series)
-                data = data.sort_index()
-
-                # 3. Handle duplicate indices (if any, though rare with unique timestamps)
-                if not data.index.is_unique:
-                    logger.warning(
-                        "Duplicate timestamps found in data index. Dropping duplicates."
-                    )
-                    data = data[~data.index.duplicated(keep="first")]
-
-                full_hourly_index = pd.date_range(
-                    start=data.index.min(), end=data.index.max(), freq="h", tz="UTC"
-                )  # Ensure correct timezone
-
-                data = data.reindex(full_hourly_index)
-
-                if "users" in data.columns:
-                    data["users"] = data["users"].fillna(0)
-                for col in data.columns:
-                    if col != "users":
-                        data[col] = data[col].fillna(method="ffill")
-                data = data.fillna(method="bfill")  # Catch any NaNs at the very start
-
-                try:
-                    data.index.freq = pd.infer_freq(data.index)
-                    if data.index.freq != "h":
-                        logger.warning(
-                            f"Inferred frequency {data.index.freq} is not 'h'. Setting to 'h'. This might still cause issues if actual data is not strictly hourly."
-                        )
-                        data.index.freq = "h"
-                except ValueError:
-                    logger.error(
-                        "Could not infer frequency from resampled data. Attempting to set to 'h'."
-                    )
-                    data.index.freq = "h"
-
+        data = load_data_from_db(start_time, stop_time)
+        data = prepare_time_series_data(data)
         # Step 2: Feature extraction (rest of the function continues as before)
-        if current_tracer:
-            with current_tracer.start_as_current_span("extract-features") as span:
-                # Ensure 'users' column exists
-                if "users" not in data.columns:
-                    logger.error(
-                        "Missing 'users' column in loaded data (after resampling)."
-                    )  # Added clarity
-                    raise ValueError(
-                        "The 'users' column is required but not found in the loaded data."
-                    )
-
-                y = data["users"].copy()
-                exog = data.drop(columns=["users"]).copy()
-                exog_features = exog.columns.to_list()
-                if current_tracer:
-                    span.set_attribute("num_features", len(exog_features))
-                logger.info(f"Extracted {len(exog_features)} exogenous features.")
-
+        y, exog, exog_features = extract_target_and_exog(data)
         # Step 3: Validation slicing
-        if current_tracer:
-            with current_tracer.start_as_current_span("prepare-validation-window"):
-                # Ensure enough data for validation *after resampling*
-                if len(data) < forecast_hours + 2:
-                    logger.error(
-                        "Not enough data for forecasting and validation after resampling."
-                    )  # Added clarity
-                    raise ValueError(
-                        "Not enough data for forecasting and validation given forecast_hours."
-                    )
-
-                end_validation = data.index[-forecast_hours - 1]
-                logger.info(f"Validation ends at: {end_validation}")
-                end_validation_dt = end_validation
-
-        # Step 4: Create transformers
-        if current_tracer:
-            with current_tracer.start_as_current_span("init-transformers"):
-                window_features = RollingFeatures(
-                    stats=["mean"], window_sizes=window_sizes
-                )
-                encoder = create_encoder()
-                logger.info("Initialized transformers.")
-
+        end_validation_dt = get_validation_cutoff(data, forecast_hours)
+        # Step 4: Initialize transformer
+        with tracer.start_as_current_span("init-transformers"):
+            window_features = RollingFeatures(stats=["mean"], window_sizes=window_sizes)
+            encoder = create_encoder()
+            logger.info("Initialized transformers.")
         # Step 5: Hyperparameter tuning
-        if current_tracer:
-            with current_tracer.start_as_current_span("tune-model") as tuning_span:
-                result = run_bayesian_hyperparameter_search_and_fit(
-                    data=data,  # Pass the entire DataFrame to the tuning function
-                    end_validation=end_validation.strftime("%Y-%m-%d %H:%M:%S%z"),
-                    exog_features=exog_features,
-                    window_features=window_features,
-                    transformer_exog=encoder,
-                    n_trials=10,
-                    steps=forecast_hours,
-                    initial_train_size=round(len(y) * 0.9),
-                    random_state=2025,
-                )
-                if current_tracer:
-                    tuning_span.set_attribute(
-                        "best_score", result.get("best_score", "n/a")
-                    )
-                logger.info(
-                    "Hyperparameter tuning completed.",
-                    best_score=result.get("best_score"),
-                )
-
+        with tracer.start_as_current_span("tune-model") as tuning_span:
+            result = run_bayesian_hyperparameter_search_and_fit(
+                data=data,  # Pass the entire DataFrame to the tuning function
+                end_validation=end_validation_dt.strftime("%Y-%m-%d %H:%M:%S%z"),
+                exog_features=exog_features,
+                window_features=window_features,
+                transformer_exog=encoder,
+                n_trials=10,
+                steps=forecast_hours,
+                initial_train_size=round(len(y) * 0.9),
+                random_state=2025,
+            )
+            tuning_span.set_attribute("best_score", result.get("best_score", "n/a"))
+            logger.info(
+                "Hyperparameter tuning completed.",
+                best_score=result.get("best_score"),
+            )
         # Step 6: Train final model
-        if current_tracer:
-            with current_tracer.start_as_current_span("train-best-model"):
-                model = train_forecaster_with_best_params(
-                    data=data,
-                    end_validation=end_validation.strftime("%Y-%m-%d %H:%M:%S%z"),
-                    exog_features=exog_features,
-                    window_features=window_features,
-                    transformer_exog=encoder,
-                    best_params=result["best_params"],
-                    best_lags=result["best_lags"],
-                )
-                logger.info("Final model trained.")
-
+        with tracer.start_as_current_span("train-best-model"):
+            model = train_forecaster_with_best_params(
+                data=data,
+                end_validation=end_validation_dt.strftime("%Y-%m-%d %H:%M:%S%z"),
+                exog_features=exog_features,
+                window_features=window_features,
+                transformer_exog=encoder,
+                best_params=result["best_params"],
+                best_lags=result["best_lags"],
+            )
+            logger.info("Final model trained.")
         # Step 7: Make prediction
-        if current_tracer:
-            with current_tracer.start_as_current_span("make-predictions"):
-                # Ensure exog_pred aligns with the data index after end_validation
-                exog_pred_start_dt = data.index[data.index > end_validation_dt].min()
-
-                if pd.isna(exog_pred_start_dt):
-                    logger.error(
-                        "No future exogenous data available for prediction within the loaded range after resampling."
-                    )  # Added clarity
-                    raise ValueError(
-                        "No future exogenous data available for prediction within the loaded range."
-                    )
-
-                exog_pred = data.loc[exog_pred_start_dt:, exog_features].head(
-                    forecast_hours
-                )
-
-                if len(exog_pred) < forecast_hours:
-                    logger.warning(
-                        f"Not enough future exogenous data for {forecast_hours} steps. Predicting only {len(exog_pred)} steps."
-                    )
-
-                predictions = model.predict(steps=len(exog_pred), exog=exog_pred)
-                logger.info(f"Predictions made for {len(predictions)} steps.")
-
+        predictions, exog_pred, forecast_index = predict_future(
+            model, data, exog_features, end_validation_dt, forecast_hours
+        )
         # Step 8: Post-process forecast
-        if current_tracer:
-            with current_tracer.start_as_current_span(
-                "combine-results"
-            ) as combine_span:
-                future_index = exog_pred.index
-                if "users" not in data.columns:
-                    logger.error(
-                        "Missing 'users' column in loaded data for real_users comparison (after resampling)."
-                    )  # Added clarity
-                    raise ValueError(
-                        "Cannot compare to 'real_users': column not found."
-                    )
-
-                forecast_df = pd.DataFrame(
-                    {
-                        "date_time": future_index,
-                        "predicted_users": np.ceil(predictions).astype(int),
-                        "real_users": data.loc[future_index, "users"].values,
-                    }
-                )
-                forecast_df.set_index("date_time", inplace=True)
-                forecast_df = pd.concat([forecast_df, exog_pred], axis=1)
-                logger.info("Forecast results combined.")
-
+        forecast_df = combine_forecast_with_truth(predictions, exog_pred, data)
         # Step 9: Evaluate
-        if current_tracer:
-            with current_tracer.start_as_current_span("evaluate") as eval_span:
-                if len(forecast_df["real_users"]) != len(
-                    forecast_df["predicted_users"]
-                ):
-                    logger.warning(
-                        "Length mismatch between real_users and predicted_users for MAE calculation."
-                    )
-                    mae = None
-                else:
-                    mae = mean_absolute_error(
-                        forecast_df["real_users"], forecast_df["predicted_users"]
-                    )
-                forecast_df.index = forecast_df.index.strftime("%Y-%m-%d %H:%M:%S")
-                if current_tracer:
-                    eval_span.set_attribute("mae", mae)
-                logger.info("Forecast evaluated.", mae=mae)
-
+        mae = evaluate_forecast(forecast_df)
     return forecast_df, mae

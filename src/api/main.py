@@ -26,23 +26,25 @@ resource = Resource.create(
 )
 
 # For the testing purpose
-env_value = os.environ.get("ENV")
-IS_TESTING = (env_value is None) or (
-    env_value.lower() == "test" if env_value else False
-)
+IS_TESTING = os.getenv("ENV", "").lower() == "test"
 
-# Create a TracerProvider with the defined resource
-provider = TracerProvider(resource=resource)
-otlp_endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318")
-otlp_exporter = OTLPSpanExporter(endpoint=otlp_endpoint)
-span_processor = BatchSpanProcessor(otlp_exporter)
 
-# Add the span processor to the provider
-provider.add_span_processor(span_processor)
+if not IS_TESTING:
+    # Create a TracerProvider with the defined resource
+    provider = TracerProvider(resource=resource)
+    otlp_endpoint = os.getenv(
+        "OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318/v1/traces"
+    )
+    otlp_exporter = OTLPSpanExporter(endpoint=otlp_endpoint)
+    span_processor = BatchSpanProcessor(otlp_exporter)
 
-# Set the global tracer provider
-trace.set_tracer_provider(provider)
+    # Add the span processor to the provider
+    provider.add_span_processor(span_processor)
 
+    # Set the global tracer provider
+    trace.set_tracer_provider(provider)
+
+    tracer = trace.get_tracer("application.tracer")
 
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 ENABLE_DIAGNOSE = (
@@ -72,11 +74,6 @@ logger.configure(
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="src/static"), name="static")
-
-# acquire tracer
-tracer = trace.get_tracer(
-    "application.tracer"
-)  # This tracer will now use the configured provider
 
 
 def apply_logger_catch(func):
@@ -119,14 +116,14 @@ async def dispatch_middleware(request: Request, call_next):
 
 
 @app.get("/")
-async def root():
+def root():
     logger.info("Root endpoint called")
     return {"message": "Hello World"}
 
 
 @app.get("/data-range")
 @logger.catch
-async def get_data_range():
+def get_data_range():
     """
     Returns the minimum and maximum timestamps available in the database.
     """
@@ -217,7 +214,7 @@ async def predict_tuning(
 
 @app.post("/predict-tuning-db")
 @apply_logger_catch
-async def predict_tuning_db(
+def predict_tuning_db(
     forecast_hours: int = Query(..., gt=0, description="Number of hours to forecast"),
     window_sizes: int = Query(
         ..., gt=0, description="Window sizes for rolling features"

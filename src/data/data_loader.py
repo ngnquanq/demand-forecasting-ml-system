@@ -7,10 +7,13 @@ import psycopg2
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 from loguru import logger
+from opentelemetry import trace
 from psycopg2 import Error
 from sklearn.compose import make_column_selector, make_column_transformer
 from sklearn.metrics import mean_absolute_error
 from sklearn.preprocessing import FunctionTransformer, OrdinalEncoder, TargetEncoder
+
+tracer = trace.get_tracer("application.tracer")
 
 DEFAULT_DB_HOST = "localhost"
 DEFAULT_DB_NAME = "postgres"
@@ -168,7 +171,43 @@ def get_data_as_dataframe_filtered(
             logger.info("PostgreSQL connection closed.")
 
 
-def load_data_from_csv(file: UploadFile = File(...)) -> pd.DataFrame:
+def load_data_from_db(start_time, stop_time):
+    with tracer.start_as_current_span("load-data-from-db"):
+        logger.info(
+            "Loading data from database.",
+            db_start_time=start_time,
+            db_stop_time=stop_time,
+        )
+
+        host, database, user, password, schema_name, table_name, time_column = (
+            get_db_connection_params()
+        )
+
+        data = get_data_as_dataframe_filtered(
+            host=host,
+            database=database,
+            user=user,
+            password=password,
+            schema_name=schema_name,
+            table_name=table_name,
+            time_column=time_column,
+            start_time=start_time,
+            stop_time=stop_time,
+        )
+
+        if data is None or data.empty:
+            logger.error(
+                "No data loaded from the database for the specified time range."
+            )
+            raise ValueError(
+                "No data loaded from the database for the specified time range."
+            )
+
+        logger.info(f"Data loaded successfully. Shape: {data.shape}")
+        return data
+
+
+def load_data_from_csv(file: UploadFile = File(...)):
     try:
         if not file.filename.endswith(".csv"):
             raise HTTPException(status_code=400, detail="File must be a CSV")
