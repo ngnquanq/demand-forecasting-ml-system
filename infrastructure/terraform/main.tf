@@ -6,7 +6,7 @@ resource "google_compute_instance" "vm" {
   boot_disk {
     initialize_params {
       image = "debian-cloud/debian-12"
-      size  = 15
+      size  = 25 //increase boot disk size from 15 to 20
     }
   }
 
