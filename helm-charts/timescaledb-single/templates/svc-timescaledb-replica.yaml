@@ -1,0 +1,44 @@
+# This file and its contents are licensed under the Apache License 2.0.
+# Please see the included NOTICE for copyright information and LICENSE for a copy of the license.
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "clusterName" . }}-replica
+  namespace: {{ .Release.Namespace }}
+  labels:
+    component: postgres
+    role: replica
+    {{ include "timescaledb-helm.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+{{- if .Values.service.replica.labels }}
+{{ .Values.service.replica.labels | toYaml | indent 4 }}
+{{- end }}
+{{- if .Values.service.replica.annotations }}
+  annotations:
+{{ .Values.service.replica.annotations | toYaml | indent 4 }}
+{{- end }}
+spec:
+  selector:
+    app: {{ template "timescaledb.fullname" . }}
+    cluster-name: {{ template "clusterName" . }}
+    role: replica
+  type: {{ .Values.service.replica.type }}
+  ports:
+{{- if .Values.pgBouncer.enabled }}
+  - name: pgbouncer
+    port: {{ .Values.pgBouncer.port }}
+    targetPort: pgbouncer
+    protocol: TCP
+{{- end }}
+  - name: postgresql
+    # This always defaults to 5432
+    port: {{ .Values.service.replica.port }}
+    targetPort: postgresql
+    protocol: TCP
+    {{- if and (eq .Values.service.replica.type "NodePort") .Values.service.replica.nodePort }}
+    nodePort: {{ .Values.service.replica.nodePort }}
+    {{- end }}
+{{- if .Values.service.replica.spec }}
+{{ .Values.service.replica.spec | toYaml | indent 2 }}
+{{- end }}

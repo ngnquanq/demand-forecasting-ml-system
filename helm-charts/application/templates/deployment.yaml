@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    app: {{ .Release.Name }}
+  namespace: model-serving
+spec:
+  replicas: {{ .Values.spec.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: {{ .Release.Name }}
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          imagePullPolicy: "{{ .Values.image.pullPolicy }}"
+          env:
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ .Values.tracing.environmentVariables.OTEL_EXPORTER_OTLP_ENDPOINT | quote }} # Added | quote for safety
+            - name: OTEL_SERVICE_NAME
+              value: {{ .Values.tracing.environmentVariables.OTEL_SERVICE_NAME | quote }} # Added | quote for safety
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: {{ .Values.tracing.environmentVariables.OTEL_RESOURCE_ATTRIBUTES | quote }} # Added | quote for safety
+            {{- if .Values.database.enabled }}
+              {{- range $key, $value := .Values.database.environmentVariables }}
+                {{- if and (ne $key "DB_PASSWORD_SECRET_NAME") (ne $key "DB_PASSWORD_SECRET_KEY") }}
+            - name: {{ $key | quote }}
+              value: {{ $value | quote }}
+                {{- end }}
+              {{- end }}
+            # Special handling for DB_PASSWORD to get it from a Secret
+            - name: DB_PASSWORD
+              value: {{ .Values.database.environmentVariables.DB_PASSWORD | quote }}
+            {{- end }}
+            - name: ENV
+              value: {{ .Values.tracing.env | quote }}

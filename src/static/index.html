@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Simple Demand Forecasting</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* Optional: Add some spacing for readability */
+        .section {
+            padding-top: 2rem;
+            padding-bottom: 2rem;
+        }
+        .box {
+            margin-top: 2rem;
+        }
+        /* New CSS for larger chart */
+        #forecastChart {
+            height: 400px; /* Set a fixed height for the chart canvas */
+            width: 100%; /* Ensure it takes full width of its container */
+        }
+    </style>
+</head>
+<body class="section">
+<div class="container">
+    <h1 class="title has-text-centered">Demand Forecasting</h1>
+
+    <div class="tabs is-centered is-boxed">
+        <ul>
+            <li class="is-active" data-tab="file-upload"><a>File Upload</a></li>
+            <li data-tab="db-query"><a>Database Query</a></li>
+        </ul>
+    </div>
+
+    <form id="predictForm" class="box">
+        <div id="file-upload-content" class="tab-content">
+            <h2 class="subtitle">Forecast from CSV File</h2>
+            <div class="field">
+                <label class="label">CSV File</label>
+                <div class="control">
+                    <input id="file" class="input" type="file" accept=".csv" required>
+                </div>
+            </div>
+        </div>
+
+        <div id="db-query-content" class="tab-content is-hidden">
+            <h2 class="subtitle">Forecast from Database</h2>
+            <div class="field">
+                <label class="label">Available Data Range:</label>
+                <div class="control">
+                    <p id="data-range-display" class="help">Loading...</p>
+                </div>
+            </div>
+            <div class="field is-grouped is-grouped-multiline">
+                <div class="control is-expanded">
+                    <label class="label">Start Time</label>
+                    <input id="start_time" class="input" type="datetime-local" step="3600" required>
+                    <p class="help">Format:YYYY-MM-DDTHH:MM</p>
+                </div>
+                <div class="control is-expanded">
+                    <label class="label">Stop Time</label>
+                    <input id="stop_time" class="input" type="datetime-local" step="3600" required>
+                    <p class="help">Format:YYYY-MM-DDTHH:MM</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="field is-grouped">
+            <div class="control">
+                <label class="label">Forecast Hours</label>
+                <input id="forecast_hours" class="input" type="number" value="36" min="1">
+            </div>
+            <div class="control">
+                <label class="label">Window Sizes</label>
+                <input id="window_sizes" class="input" type="number" value="72" min="1">
+            </div>
+        </div>
+        <div class="field">
+            <div class="control is-grouped"> <button class="button is-primary" type="submit">Predict</button>
+                <button id="downloadCsvBtn" class="button is-link" type="button" style="display:none;">Download CSV</button>
+                <button id="downloadChartBtn" class="button is-info" type="button" style="display:none;">Download Chart</button> </div>
+        </div>
+    </form>
+
+    <div class="box">
+        <canvas id="forecastChart"></canvas>
+    </div>
+
+    <table id="resultsTable" class="table is-striped is-fullwidth">
+        <thead></thead>
+        <tbody></tbody>
+    </table>
+
+    <div id="loadingIndicator" class="modal">
+      <div class="modal-background"></div>
+      <div class="modal-content has-text-centered">
+        <p class="title has-text-white">Loading...</p>
+        <progress class="progress is-large is-primary" max="100"></progress>
+      </div>
+    </div>
+</div>
+<script src="/static/script.js"></script>
+</body>
+</html>

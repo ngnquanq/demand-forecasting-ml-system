@@ -1,0 +1,36 @@
+# This file and its contents are licensed under the Apache License 2.0.
+# Please see the included NOTICE for copyright information and LICENSE for a copy of the license.
+
+{{- /*
+This ConfigMap contains scripts, like bootstrap scripts for the backup and archive scripts for
+archive_command
+*/ -}}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "timescaledb.fullname" . }}-scripts
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{ include "timescaledb-helm.labels" . | nindent 4 }}
+    app.kubernetes.io/component: scripts
+data:
+  tstune.sh: |-
+    {{- .Files.Get "scripts/tstune.sh" | nindent 4 }}
+  pgbackrest_archive.sh: |-
+    {{- .Files.Get "scripts/pgbackrest_archive.sh" | nindent 4 }}
+  pgbackrest_archive_get.sh: |-
+    {{- .Files.Get "scripts/pgbackrest_archive_get.sh" | nindent 4 }}
+  pgbackrest_bootstrap.sh: |-
+    {{- .Files.Get "scripts/pgbackrest_bootstrap.sh" | nindent 4 }}
+  pgbackrest_restore.sh: |
+    {{- .Files.Get "scripts/pgbackrest_restore.sh" | nindent 4 }}
+  restore_or_initdb.sh: |
+    {{- .Files.Get "scripts/restore_or_initdb.sh" | nindent 4 }}
+  post_init.sh: |-
+    {{- .Files.Get "scripts/post_init.sh" | nindent 4 }}
+  patroni_callback.sh: |-
+    {{- .Files.Get "scripts/patroni_callback.sh" | nindent 4 }}
+  lifecycle_preStop.sql: |-
+    {{- .Files.Get "scripts/prestop.sql" | nindent 4 }}
+...
