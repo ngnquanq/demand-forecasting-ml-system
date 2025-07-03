@@ -117,7 +117,7 @@ Before analysis, the dataset underwent several preprocessing steps:
 # High-level system architecture
 
 Looking at a high-level view, this is what the system look like:
-![High-level system architecture](assets/applicationArchitecture.png)
+![High-level system architecture](assets/applicationArchitectureNew.png)
 
 
 # Guide to install and run code
