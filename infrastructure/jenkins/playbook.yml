@@ -5,7 +5,7 @@
   become: yes # Grant sudo permission for this 
   vars:
     default_container_name: jenkins
-    default_container_image: ngnquanq/custom-jenkins:v1-20250703
+    default_container_image: ngnquanq/custom-jenkins:latest
   tasks:
     - name: Install aptitude
       apt:

@@ -24,7 +24,7 @@
         * [Monitoring Component (Using Prometheus and Grafana)](#monitoring-components)
         * [Database Component (Using TimeScaleDB - an extension of Postgres)](#database-components)
         * [Tracing Component (Using Jaeger and OTEL)](#tracing-components)
-        
+* [Further Development](#further-development)
 
 
 # Introduction
@@ -105,11 +105,10 @@ Before analysis, the dataset underwent several preprocessing steps:
 │   └── static/                             # Simple front end
 └── test/                                   # Code to test application before release
     ├── conftest.py                         
-    ├── data
-    ├── fixtures
-    ├── model
-    ├── __pycache__
-    ├── test_api
+    ├── data/
+    ├── fixtures/
+    ├── model/
+    ├── test_api/
     └── test_data.csv
 
 ```
@@ -247,3 +246,10 @@ For simplicity, we create a k8s config map with a small sample of data to ingest
 Finally is using Jaeger to create and observe trace of an API (like an entire thing, from getting the data, tuning, and predict). This is very useful when we are trying to figure out which steps that tooks lots of time so that we can prevent it just in time. 
 
 ![](/assets/installTracing.gif)
+
+# Further Development
+Further development is neccessary for a more trustworthy and robust demand forecating machine learning application. Consider these additional developments:
+- Ingest data into timescaledb from a streaming data pipeline. 
+- Increase model efficiency with more robust feature engineering techniques and more powerful algorithm.
+- Expand traefik for not only end-users who use application but also for developer who maintain the system.
+- Add authentication since not everyone should be able to use this, only those that are related to the company should be able to use the system.
